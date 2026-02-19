@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Classroom, Assignment, TopicMastery, StudentMetric } from '../types';
 import { teacherDataService } from '../services/teacherDataService';
@@ -28,11 +27,12 @@ const ProgressReports: React.FC<Props> = ({ user }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        const classList = teacherDataService.getClasses(user.username);
-        setClasses(classList);
-        if (classList.length > 0) {
-            setSelectedClassId(classList[0].id);
-        }
+        teacherDataService.getClasses(user.username).then(classList => {
+            setClasses(classList);
+            if (classList.length > 0) {
+                setSelectedClassId(classList[0].id);
+            }
+        });
     }, [user.username]);
 
     // Fetch dependent data when selection changes

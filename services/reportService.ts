@@ -1,4 +1,3 @@
-
 import { TeacherNote, StudentMetric, TopicMastery, Assignment } from '../types';
 import { teacherDataService } from './teacherDataService';
 import { assignmentService } from './assignmentService';
@@ -73,7 +72,7 @@ export const reportService = {
     },
 
     getAssignmentMatrix: async (classId: string, assignmentId: string) => {
-        const cls = teacherDataService.getClassById(classId);
+        const cls = await teacherDataService.getClassById(classId);
         if (!cls) return [];
         
         const teacherId = 'brak'; // Mock context fallback

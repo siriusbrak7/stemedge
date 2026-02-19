@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Classroom, Assignment, AssignmentItem, Topic } from '../types';
 import { teacherDataService } from '../services/teacherDataService';
@@ -17,8 +16,12 @@ interface Props {
 
 const AssignmentBuilder: React.FC<Props> = ({ user, onClose, onSave }) => {
     const [step, setStep] = useState(1);
-    const classes = teacherDataService.getClasses(user.username);
+    const [classes, setClasses] = useState<Classroom[]>([]);
     const [topics, setTopics] = useState<Topic[]>([]);
+
+    useEffect(() => {
+        teacherDataService.getClasses(user.username).then(setClasses);
+    }, [user.username]);
 
     useEffect(() => {
         studentDataService.getDashboardData('temp').then(data => {
@@ -156,7 +159,6 @@ const AssignmentBuilder: React.FC<Props> = ({ user, onClose, onSave }) => {
                         );
                     })
                 ) : (
-                    // Mocking quiz list based on topics for demo
                     topics.map(topic => {
                          const itemId = `quiz-${topic.id}`;
                          const isSelected = selectedItems.some(i => i.id === itemId);
