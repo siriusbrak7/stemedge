@@ -41,12 +41,12 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
 
         const fetchData = async () => {
             // Use user.id for service calls (UUID), but display name uses username
-            const dashboardData = await studentDataService.getDashboardData(user.id);
-            const asgData = await assignmentService.getStudentAssignments(user.id);
+            const dashboardData = await studentDataService.getDashboardData(user.id!);
+            const asgData = await assignmentService.getStudentAssignments(user.id!);
             
-            const currentStreak = gamificationService.updateStreak(user.id);
+            const currentStreak = gamificationService.updateStreak(user.id!);
             const badges = gamificationService.getAllBadges();
-            const earned = gamificationService.getUserBadges(user.id);
+            const earned = gamificationService.getUserBadges(user.id!);
 
             if (isMounted) {
                 setData(dashboardData);
@@ -74,15 +74,15 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
     }, [user.id]); 
 
     const checkBadges = async () => {
-        const earned = await gamificationService.checkForNewBadges(user.id);
+        const earned = await gamificationService.checkForNewBadges(user.id!);
         if (earned.length > 0) {
-            setUserBadges(gamificationService.getUserBadges(user.id)); 
+            setUserBadges(gamificationService.getUserBadges(user.id!)); 
             setNewBadge(earned[0]); 
         }
     };
 
     const handleAssignmentItemClick = (assignmentId: string, item: { id: string, type: 'lesson' | 'quiz', contentId: string }) => {
-        assignmentService.updateStudentProgress(user.id, assignmentId, item.id, false); 
+        assignmentService.updateStudentProgress(user.id!, assignmentId, item.id, false); 
         if (item.type === 'lesson') {
             navigate(`/lesson/${item.contentId}`);
         } else {
@@ -372,7 +372,7 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
                     <h2 className="text-xl font-bold text-white tracking-wide">Virtual Labs</h2>
                 </div>
                 <VirtualLabsList 
-                    studentId={user.id}
+                    studentId={user.id!}
                     onStartLab={(lab) => navigate(`/lab/${lab.id}`)} 
                 />
             </section>
