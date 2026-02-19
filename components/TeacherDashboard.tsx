@@ -36,12 +36,7 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
 
     useEffect(() => {
         if (user.role === 'teacher') {
-            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            if (isDev && user.username.includes('test')) {
-                setIsApproved(true);
-            } else {
-                setIsApproved(user.isApproved || false);
-            }
+            setIsApproved(user.isApproved || false);
         } else {
             setIsApproved(true);
         }
@@ -94,16 +89,8 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                     <h2 className="text-2xl font-bold text-white mb-3">Account Pending Approval</h2>
                     <p className="text-slate-400 mb-6">
                         Your teacher account is awaiting review by an administrator. 
-                        You'll receive access once approved. This usually takes 24-48 hours.
+                        You'll receive access once approved.
                     </p>
-                    <div className="bg-slate-800/50 rounded-lg p-4 mb-6">
-                        <p className="text-sm text-slate-400 mb-2">Registration details:</p>
-                        <p className="text-white font-medium">{user.username}</p>
-                        <p className="text-xs text-slate-500 mt-2">Joined: {new Date().toLocaleDateString()}</p>
-                    </div>
-                    <div className="text-sm text-slate-500">
-                        Questions? Contact <span className="text-cyan-400">admin@stemed.com</span>
-                    </div>
                 </div>
             </div>
         );
@@ -114,7 +101,7 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
             <div className="min-h-screen pt-24 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
-                    <p className="text-slate-400 animate-pulse">Accessing Command Center...</p>
+                    <p className="text-slate-400 animate-pulse">Loading...</p>
                 </div>
             </div>
         );
@@ -130,25 +117,23 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
     };
 
     const handleDownloadReport = () => {
+        if (!selectedClass) return;
         const text = "Student Name,Progress,Average Score,Status\n" + 
-            (selectedClass ? selectedClass.students.map(s => 
+            selectedClass.students.map(s => 
                 `${s.name},${s.overallProgress}%,${s.averageScore}%,${s.atRisk ? 'At Risk' : 'On Track'}`
-            ).join('\n') : "");
+            ).join('\n');
         
         const element = document.createElement("a");
         const file = new Blob([text], {type: 'text/plain'});
         element.href = URL.createObjectURL(file);
-        element.download = `report_${selectedClass?.id || 'all'}.csv`;
+        element.download = `report_${selectedClass.id}.csv`;
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
     };
 
     const handleCreateClass = () => {
-        const name = prompt("Enter Class Name:");
-        if (name) {
-            alert(`Class "${name}" created! (Mock)`);
-        }
+        alert("Class creation not implemented yet.");
     };
 
     if (showBuilder) {
@@ -165,7 +150,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
     }
 
     if (selectedClass) {
-        
         const filteredStudents = selectedClass.students.filter(s => 
             s.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
@@ -230,63 +214,69 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                                 <input type="text" placeholder="Search student..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-1.5 text-sm text-white focus:outline-none focus:border-cyan-500 w-48 md:w-64" />
                             </div>
                         </div>
-                        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-950/50 border-b border-slate-800 text-slate-400 uppercase font-medium text-xs">
-                                    <tr>
-                                        <th className="px-6 py-4">Student Name</th>
-                                        <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4">Progress</th>
-                                        <th className="px-6 py-4">Avg Score</th>
-                                        <th className="px-6 py-4 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800">
-                                    {filteredStudents.map((student) => (
-                                        <tr key={student.id} className="hover:bg-slate-800/50 transition-colors group">
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium text-white">{student.name}</div>
-                                                <div className="text-xs text-slate-500">ID: {student.id.substring(0, 8)}...</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {student.atRisk ? (
-                                                    <span className="text-red-400 bg-red-900/20 px-2 py-0.5 rounded text-xs border border-red-900/50 flex items-center gap-1 w-fit">
-                                                        <AlertTriangle className="w-3 h-3" /> Needs Help
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-slate-400 flex items-center gap-1">
-                                                        <CheckCircle className="w-3 h-3 text-green-500/50" /> Active
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-16 h-1.5 bg-slate-800 rounded-full">
-                                                        <div className={`h-full rounded-full ${student.overallProgress < 40 ? 'bg-red-500' : student.overallProgress < 70 ? 'bg-amber-500' : 'bg-green-500'}`} 
-                                                            style={{ width: `${student.overallProgress}%` }} />
-                                                    </div>
-                                                    <span className="text-xs text-slate-400">{student.overallProgress}%</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`font-mono font-bold ${
-                                                    student.averageScore < 60 ? 'text-red-400' : 
-                                                    student.averageScore < 75 ? 'text-amber-400' : 
-                                                    'text-green-400'
-                                                }`}>
-                                                    {student.averageScore}%
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white">
-                                                    <MoreHorizontal className="w-4 h-4" />
-                                                </button>
-                                            </td>
+                        {filteredStudents.length === 0 ? (
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-500">
+                                No students match your search.
+                            </div>
+                        ) : (
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-950/50 border-b border-slate-800 text-slate-400 uppercase font-medium text-xs">
+                                        <tr>
+                                            <th className="px-6 py-4">Student Name</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Progress</th>
+                                            <th className="px-6 py-4">Avg Score</th>
+                                            <th className="px-6 py-4 text-right">Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                        {filteredStudents.map((student) => (
+                                            <tr key={student.id} className="hover:bg-slate-800/50 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium text-white">{student.name}</div>
+                                                    <div className="text-xs text-slate-500">ID: {student.id.substring(0, 8)}...</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {student.atRisk ? (
+                                                        <span className="text-red-400 bg-red-900/20 px-2 py-0.5 rounded text-xs border border-red-900/50 flex items-center gap-1 w-fit">
+                                                            <AlertTriangle className="w-3 h-3" /> Needs Help
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400 flex items-center gap-1">
+                                                            <CheckCircle className="w-3 h-3 text-green-500/50" /> Active
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-16 h-1.5 bg-slate-800 rounded-full">
+                                                            <div className={`h-full rounded-full ${student.overallProgress < 40 ? 'bg-red-500' : student.overallProgress < 70 ? 'bg-amber-500' : 'bg-green-500'}`} 
+                                                                style={{ width: `${student.overallProgress}%` }} />
+                                                        </div>
+                                                        <span className="text-xs text-slate-400">{student.overallProgress}%</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`font-mono font-bold ${
+                                                        student.averageScore < 60 ? 'text-red-400' : 
+                                                        student.averageScore < 75 ? 'text-amber-400' : 
+                                                        'text-green-400'
+                                                    }`}>
+                                                        {student.averageScore}%
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white">
+                                                        <MoreHorizontal className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                     
                     <div className="space-y-6">
@@ -295,20 +285,24 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                                 <BarChart className="w-4 h-4 text-cyan-400" />
                                 Class Insights
                             </h3>
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-400">Struggling Students</span>
-                                    <span className="text-white font-bold">{strugglingStudents.length}</span>
+                            {selectedClass.students.length === 0 ? (
+                                <p className="text-slate-500 text-sm">No student data available.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-400">Struggling Students</span>
+                                        <span className="text-white font-bold">{strugglingStudents.length}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-400">Inactive (greater than 5 days)</span>
+                                        <span className="text-white font-bold">{inactiveStudents.length}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-400">Ready for Enrichment</span>
+                                        <span className="text-white font-bold">{enrichmentStudents.length}</span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-400">Inactive (greater than 5 days)</span>
-                                    <span className="text-white font-bold">{inactiveStudents.length}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-400">Ready for Enrichment</span>
-                                    <span className="text-white font-bold">{enrichmentStudents.length}</span>
-                                </div>
-                            </div>
+                            )}
                         </div>
                         
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
@@ -337,7 +331,7 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
             <div className="flex justify-between items-end mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-2">Command Center</h1>
-                    <p className="text-slate-400">Manage your academic fleet.</p>
+                    <p className="text-slate-400">Manage your classes.</p>
                 </div>
                 <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1 overflow-x-auto">
                     {[
@@ -382,64 +376,75 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
 
             {activeTab === 'overview' && (
                 <>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        {classes.map((cls) => (
-                            <div 
-                                key={cls.id} 
-                                onClick={() => setSelectedClass(cls)}
-                                className="group relative bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-purple-500/50 hover:bg-slate-800 transition-all cursor-pointer"
-                            >
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="p-3 bg-slate-800 rounded-xl border border-slate-700 group-hover:border-purple-500/30 transition-colors">
-                                        <Users className="w-6 h-6 text-cyan-400" />
-                                    </div>
-                                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border ${getHealthColor(cls.health)}`}>
-                                        {cls.health === 'critical' ? 'Attention' : cls.health}
-                                    </span>
-                                </div>
-                                
-                                <h3 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-400 transition-colors">{cls.name}</h3>
-                                <p className="text-slate-400 text-sm mb-6">{cls.subject}</p>
-
-                                <div className="grid grid-cols-2 gap-4 border-t border-slate-800 pt-4">
-                                    <div>
-                                        <p className="text-slate-500 text-xs uppercase mb-1">Students</p>
-                                        <p className="text-white font-mono font-bold text-lg">{cls.studentCount}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 text-xs uppercase mb-1">Avg Score</p>
-                                        <p className={`font-mono font-bold text-lg ${cls.averageScore < 70 ? 'text-red-400' : 'text-green-400'}`}>
-                                            {cls.averageScore}%
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                <div className="mt-4 flex gap-1">
-                                    <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-cyan-500" style={{ width: `${cls.averageProgress}%` }} />
-                                    </div>
-                                    <span className="text-xs text-slate-500">{cls.averageProgress}%</span>
-                                </div>
-                                
-                                <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <ChevronRight className="w-5 h-5 text-slate-400" />
-                                </div>
-                            </div>
-                        ))}
-                         
-                        <div 
-                            onClick={handleCreateClass}
-                            className="bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-900 hover:border-slate-700 transition-all min-h-[280px]"
-                        >
-                            <div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center mb-4">
-                                <Plus className="w-6 h-6 text-slate-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-white mb-2">Create Class</h3>
-                            <p className="text-slate-500 text-sm text-center max-w-[200px]">
-                                Add a new classroom to your dashboard
-                            </p>
+                    {classes.length === 0 ? (
+                        <div className="bg-slate-900 border border-dashed border-slate-800 rounded-2xl p-12 text-center">
+                            <Users className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-white mb-2">No classes yet</h3>
+                            <p className="text-slate-500 mb-6">Create your first class to get started.</p>
+                            <button onClick={handleCreateClass} className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg inline-flex items-center gap-2">
+                                <Plus className="w-4 h-4" /> Create Class
+                            </button>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {classes.map((cls) => (
+                                <div 
+                                    key={cls.id} 
+                                    onClick={() => setSelectedClass(cls)}
+                                    className="group relative bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-purple-500/50 hover:bg-slate-800 transition-all cursor-pointer"
+                                >
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="p-3 bg-slate-800 rounded-xl border border-slate-700 group-hover:border-purple-500/30 transition-colors">
+                                            <Users className="w-6 h-6 text-cyan-400" />
+                                        </div>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider border ${getHealthColor(cls.health)}`}>
+                                            {cls.health === 'critical' ? 'Attention' : cls.health}
+                                        </span>
+                                    </div>
+                                    
+                                    <h3 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-400 transition-colors">{cls.name}</h3>
+                                    <p className="text-slate-400 text-sm mb-6">{cls.subject}</p>
+
+                                    <div className="grid grid-cols-2 gap-4 border-t border-slate-800 pt-4">
+                                        <div>
+                                            <p className="text-slate-500 text-xs uppercase mb-1">Students</p>
+                                            <p className="text-white font-mono font-bold text-lg">{cls.studentCount}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-slate-500 text-xs uppercase mb-1">Avg Score</p>
+                                            <p className={`font-mono font-bold text-lg ${cls.averageScore < 70 ? 'text-red-400' : 'text-green-400'}`}>
+                                                {cls.averageScore}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-4 flex gap-1">
+                                        <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                            <div className="h-full bg-cyan-500" style={{ width: `${cls.averageProgress}%` }} />
+                                        </div>
+                                        <span className="text-xs text-slate-500">{cls.averageProgress}%</span>
+                                    </div>
+                                    
+                                    <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <ChevronRight className="w-5 h-5 text-slate-400" />
+                                    </div>
+                                </div>
+                            ))}
+                            
+                            <div 
+                                onClick={handleCreateClass}
+                                className="bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-900 hover:border-slate-700 transition-all min-h-[280px]"
+                            >
+                                <div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                                    <Plus className="w-6 h-6 text-slate-400" />
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">Create Class</h3>
+                                <p className="text-slate-500 text-sm text-center max-w-[200px]">
+                                    Add a new classroom
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
 
@@ -458,21 +463,20 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                         </button>
                     </div>
 
-                    <div className="space-y-4">
-                        {assignments.length === 0 ? (
-                            <div className="text-center py-16 bg-slate-900 rounded-2xl border border-dashed border-slate-800">
-                                <ClipboardList className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-                                <p className="text-slate-400 mb-2">No active assignments</p>
-                                <p className="text-sm text-slate-500 mb-6">Create your first assignment to get started</p>
-                                <button 
-                                    onClick={() => setShowBuilder(true)}
-                                    className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors inline-flex items-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" /> Create Assignment
-                                </button>
-                            </div>
-                        ) : (
-                            assignments.map(asg => {
+                    {assignments.length === 0 ? (
+                        <div className="text-center py-16 bg-slate-900 rounded-2xl border border-dashed border-slate-800">
+                            <ClipboardList className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                            <p className="text-slate-400 mb-2">No assignments yet</p>
+                            <button 
+                                onClick={() => setShowBuilder(true)}
+                                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors inline-flex items-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" /> Create Assignment
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {assignments.map(asg => {
                                 const classNames = asg.classIds
                                     .map(cid => classes.find(c => c.id === cid)?.name)
                                     .filter(Boolean)
@@ -527,9 +531,9 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                                         </div>
                                     </div>
                                 );
-                            })
-                        )}
-                    </div>
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -548,20 +552,9 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                         <h2 className="text-xl font-bold text-white">Virtual Labs</h2>
                     </div>
                     
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-cyan-500/30 transition-all">
-                                <div className="w-12 h-12 bg-cyan-900/30 rounded-xl flex items-center justify-center mb-4">
-                                    <FlaskConical className="w-6 h-6 text-cyan-400" />
-                                </div>
-                                <h3 className="text-lg font-bold text-white mb-2">Microscopy Lab {i}</h3>
-                                <p className="text-slate-400 text-sm mb-4">Cell structure identification and analysis</p>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">{12 + i} students completed</span>
-                                    <span className="text-cyan-400 font-medium">View →</span>
-                                </div>
-                            </div>
-                        ))}
+                    <div className="bg-slate-900 border border-dashed border-slate-800 rounded-2xl p-12 text-center">
+                        <FlaskConical className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                        <p className="text-slate-400">No lab data available.</p>
                     </div>
                 </div>
             )}
