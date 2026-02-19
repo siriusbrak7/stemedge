@@ -23,7 +23,7 @@ export const studentDataService = {
                 const { data: session } = await supabase.auth.getSession();
                 if (session.session) {
                     const { data, error } = await supabase
-                        .from('progress')
+                        .from('user_topic_progress')
                         .select('*')
                         .eq('user_id', session.session.user.id);
 
@@ -93,7 +93,7 @@ export const studentDataService = {
             const { data: session } = await supabase.auth.getSession();
             if (session.session) {
                 const { error } = await supabase
-                    .from('progress')
+                    .from('user_topic_progress')
                     .upsert({ ...updateData, user_id: session.session.user.id }, { onConflict: 'user_id, topic_id' });
                 
                 if (error) console.error("Progress sync error:", error);
