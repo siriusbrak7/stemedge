@@ -1,8 +1,20 @@
-
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Assignment, StudentAssignmentProgress } from '../types';
 
-// Fallback Mock Data ONLY if Supabase is invalid
+// Queue for offline updates
+interface PendingUpdate {
+    id: string;
+    studentId: string;
+    assignmentId: string;
+    itemId: string;
+    isComplete: boolean;
+    timestamp: number;
+    retryCount: number;
+}
+
+const PENDING_QUEUE_KEY = 'assignment_pending_queue';
+
+// Fallback Mock Data
 const MOCK_ASSIGNMENTS: Assignment[] = [
     {
         id: 'asg-101',
@@ -10,7 +22,7 @@ const MOCK_ASSIGNMENTS: Assignment[] = [
         classIds: ['c-bio-101'],
         title: 'Cell Structure Basics',
         instructions: 'Complete the Cell Biology interactive module and the quiz.',
-        dueDate: Date.now() + 86400000 * 3, // 3 days from now
+        dueDate: Date.now() + 86400000 * 3,
         allowLate: true,
         status: 'published',
         items: [
@@ -24,9 +36,103 @@ const MOCK_ASSIGNMENTS: Assignment[] = [
 ];
 
 export const assignmentService = {
+    
+    // --- OFFLINE QUEUE MANAGEMENT (NEW) ---
+    getPendingQueue: (): PendingUpdate[] => {
+        const queue = localStorage.getItem(PENDING_QUEUE_KEY);
+        return queue ? JSON.parse(queue) : [];
+    },
+    
+    addToQueue: (update: Omit<PendingUpdate, 'id' | 'timestamp' | 'retryCount'>) => {
+        const queue = assignmentService.getPendingQueue();
+        const newUpdate: PendingUpdate = {
+            ...update,
+            id: `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: Date.now(),
+            retryCount: 0
+        };
+        queue.push(newUpdate);
+        localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
+        
+        // Attempt to process queue if online
+        if (navigator.onLine) {
+            assignmentService.processPendingQueue();
+        }
+    },
+    
+    processPendingQueue: async () => {
+        if (!navigator.onLine || !isSupabaseConfigured() || !supabase) return;
+        
+        const queue = assignmentService.getPendingQueue();
+        if (queue.length === 0) return;
+        
+        const { data: session } = await supabase.auth.getSession();
+        if (!session.session) return;
+        
+        const remainingQueue: PendingUpdate[] = [];
+        
+        for (const update of queue) {
+            try {
+                // Attempt the update
+                const { data: current } = await supabase
+                    .from('assignment_submissions')
+                    .select('completed_items')
+                    .eq('assignment_id', update.assignmentId)
+                    .eq('student_id', session.session.user.id)
+                    .single();
+                
+                let items = current?.completed_items || [];
+                if (update.isComplete && !items.includes(update.itemId)) {
+                    items.push(update.itemId);
+                }
+                
+                const { error } = await supabase
+                    .from('assignment_submissions')
+                    .upsert({
+                        assignment_id: update.assignmentId,
+                        student_id: session.session.user.id,
+                        completed_items: items,
+                        status: 'in_progress',
+                        last_updated: new Date().toISOString()
+                    }, { onConflict: 'assignment_id, student_id' as any });
+                
+                if (error) throw error;
+                
+                // Update local cache after successful sync
+                const cacheKey = `assignments_${update.studentId}`;
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    // Update the cached progress
+                    const target = data.find((d: any) => d.assignment.id === update.assignmentId);
+                    if (target && !target.progress.completedItemIds.includes(update.itemId)) {
+                        target.progress.completedItemIds.push(update.itemId);
+                        target.progress.lastUpdated = Date.now();
+                        localStorage.setItem(cacheKey, JSON.stringify(data));
+                    }
+                }
+                
+            } catch (error) {
+                console.warn('Queue item failed, will retry:', update.id, error);
+                update.retryCount++;
+                // Only keep items with less than 3 retries
+                if (update.retryCount < 3) {
+                    remainingQueue.push(update);
+                }
+            }
+        }
+        
+        localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(remainingQueue));
+    },
+    
     // --- STUDENT ---
     getStudentAssignments: async (studentId: string): Promise<{ assignment: Assignment, progress: StudentAssignmentProgress }[]> => {
-        // 1. Offline / Mock Mode (Strictly only if config is missing)
+        // Process any pending updates first
+        if (navigator.onLine) {
+            await assignmentService.processPendingQueue();
+        }
+        
+        // 1. Offline / Mock Mode
         if (!isSupabaseConfigured() || !supabase) {
             return MOCK_ASSIGNMENTS.map(asg => ({
                 assignment: asg,
@@ -49,7 +155,6 @@ export const assignmentService = {
             const { data: session } = await supabase.auth.getSession();
             if (!session.session) return [];
 
-            // Fetch assignments
             const { data: assignmentsData } = await supabase
                 .from('assignments')
                 .select('*')
@@ -78,7 +183,6 @@ export const assignmentService = {
                     lastUpdated: Date.now()
                 };
 
-                // Validate Content structure
                 let validItems = [];
                 if (Array.isArray(asg.content)) {
                     validItems = asg.content.filter((i: any) => i && i.id && i.type);
@@ -104,17 +208,40 @@ export const assignmentService = {
     },
 
     updateStudentProgress: async (studentId: string, assignmentId: string, itemId: string, isComplete: boolean) => {
-        // Mock Mode Persistence
+        // Update local cache immediately (optimistic UI)
+        const cacheKey = `assignments_${studentId}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            const data = JSON.parse(cached);
+            const target = data.find((d: any) => d.assignment.id === assignmentId);
+            if (target && !target.progress.completedItemIds.includes(itemId)) {
+                target.progress.completedItemIds.push(itemId);
+                target.progress.lastUpdated = Date.now();
+                localStorage.setItem(cacheKey, JSON.stringify(data));
+            }
+        }
+        
+        // Mock Mode
         if (!isSupabaseConfigured() || !supabase) {
             return;
         }
 
-        // Real Backend
+        // If offline, queue for later
+        if (!navigator.onLine) {
+            assignmentService.addToQueue({
+                studentId,
+                assignmentId,
+                itemId,
+                isComplete
+            });
+            return;
+        }
+
+        // Real Backend - Online
         try {
             const { data: session } = await supabase.auth.getSession();
             if (!session.session) return;
 
-            // Fetch current submission to append
             const { data: current } = await supabase
                 .from('assignment_submissions')
                 .select('completed_items')
@@ -137,9 +264,25 @@ export const assignmentService = {
                     last_updated: new Date().toISOString()
                 }, { onConflict: 'assignment_id, student_id' as any });
 
-            if (error) console.error("Submission error", error);
+            if (error) {
+                console.error("Submission error", error);
+                // Queue failed online attempt for retry
+                assignmentService.addToQueue({
+                    studentId,
+                    assignmentId,
+                    itemId,
+                    isComplete
+                });
+            }
         } catch (e) {
             console.error("Update progress failed", e);
+            // Queue failed online attempt for retry
+            assignmentService.addToQueue({
+                studentId,
+                assignmentId,
+                itemId,
+                isComplete
+            });
         }
     },
 
@@ -202,3 +345,10 @@ export const assignmentService = {
         }
     }
 };
+
+// Listen for online events to process queue
+if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => {
+        assignmentService.processPendingQueue();
+    });
+}

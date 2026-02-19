@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Quiz } from '../types';
 import { useQuiz } from '../hooks/useQuiz';
@@ -8,12 +7,11 @@ import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle, XCircle, Star, Clock
 
 interface Props {
     quizId?: string;
-    customQuiz?: Quiz; // Allow passing a quiz object directly
+    customQuiz?: Quiz;
     onClose: () => void;
 }
 
 const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
-    // Determine the quiz to use
     let quiz = customQuiz;
     
     if (!quiz && quizId) {
@@ -21,7 +19,6 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
         if (fetched) quiz = fetched;
     }
     
-    // Need to handle null quiz if ID doesn't exist and no custom quiz passed
     if (!quiz) {
          return (
             <div className="flex flex-col items-center justify-center h-64 bg-slate-900 rounded-2xl border border-slate-800 p-8">
@@ -49,19 +46,21 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
         calculateResults
     } = useQuiz(quiz);
 
-    // Save attempt when finished
+    // FIXED: Added answers to dependency array to prevent infinite save loop
     useEffect(() => {
         if (isFinished) {
             const results = calculateResults();
             quizService.saveAttempt({
                 quizId: quiz.id,
                 date: new Date().toISOString(),
-                ...calculateResults(),
+                score: results.score,
+                missedQuestionIds: results.missedQuestionIds,
                 userAnswers: answers,
-                totalQuestions: quiz.questions.length
+                totalQuestions: quiz.questions.length,
+                timeSpent: results.timeSpent || 0
             });
         }
-    }, [isFinished]);
+    }, [isFinished, answers, quiz.id, calculateResults]); // Added answers and other dependencies
 
     if (isFinished) {
         return (
@@ -70,9 +69,11 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
                 attempt={{
                     quizId: quiz.id,
                     date: new Date().toISOString(),
-                    ...calculateResults(),
+                    score: calculateResults().score,
+                    missedQuestionIds: calculateResults().missedQuestionIds,
                     userAnswers: answers,
-                    totalQuestions: quiz.questions.length
+                    totalQuestions: quiz.questions.length,
+                    timeSpent: calculateResults().timeSpent || 0
                 }} 
                 onRestart={restartQuiz}
                 onExit={onClose}
@@ -82,7 +83,6 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
 
     const progressPercentage = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
     
-    // Render difficulty stars
     const renderStars = (difficulty: number) => {
         return (
             <div className="flex gap-0.5">
@@ -99,7 +99,6 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">
             
-            {/* Header / Progress */}
             <div className="mb-6">
                 <div className="flex justify-between items-center mb-2 text-sm font-medium text-slate-400">
                     <span>{quiz.topicTitle}</span>
@@ -113,10 +112,8 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
                 </div>
             </div>
 
-            {/* Question Card */}
             <div className="bg-white rounded-xl shadow-xl overflow-hidden animate-fade-in-up">
                 
-                {/* Metadata Bar */}
                 <div className="px-6 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2" title="Difficulty">
@@ -154,17 +151,13 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
                             
                             if (isAnswered) {
                                 if (isCorrectAnswer) {
-                                    // Correct answer (Green)
                                     buttonClass += "bg-emerald-50 border-emerald-500 text-white shadow-md";
                                 } else if (isSelected && !isCorrectAnswer) {
-                                    // Selected wrong answer (Red)
                                     buttonClass += "bg-red-500 border-red-500 text-white shadow-md";
                                 } else {
-                                    // Unselected options (Fade out)
                                     buttonClass += "bg-slate-50 border-slate-100 text-slate-400 opacity-60 cursor-default";
                                 }
                             } else {
-                                // Default State
                                 buttonClass += "bg-white border-slate-200 text-slate-700 hover:border-blue-400 hover:bg-blue-50 cursor-pointer active:scale-[0.99]";
                             }
 
@@ -185,7 +178,6 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
                         })}
                     </div>
 
-                    {/* Feedback Section */}
                     {hasAnsweredCurrent && (
                         <div className="mb-8 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg animate-fade-in">
                             <p className="text-blue-900 font-medium mb-1">Explanation:</p>
@@ -201,7 +193,6 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
                         </div>
                     )}
 
-                    {/* Navigation Footer */}
                     <div className="flex justify-between items-center pt-6 border-t border-slate-100">
                         {currentQuestionIndex > 0 ? (
                             <button 
@@ -211,7 +202,7 @@ const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
                                 <ArrowLeft className="w-4 h-4" /> Previous
                             </button>
                         ) : (
-                            <div></div> /* Spacer */
+                            <div></div>
                         )}
 
                         <button 

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 
@@ -21,7 +20,7 @@ interface TourContextType {
 
 const TourContext = createContext<TourContextType | undefined>(undefined);
 
-// Define the tour steps
+// Define the tour steps - FIXED: Changed '#features' to '#labs'
 const TOUR_STEPS: TourStep[] = [
     { 
         target: 'body', 
@@ -47,7 +46,7 @@ const TOUR_STEPS: TourStep[] = [
         position: 'left'
     },
     { 
-        target: '#features', 
+        target: '#labs',  // CHANGED FROM '#features' TO '#labs'
         title: 'Ready for Liftoff', 
         content: 'You are all set. Explore the virtual labs and interactive lessons now!',
         position: 'bottom'
@@ -63,7 +62,7 @@ export const TourProvider: React.FC<{ children: React.ReactNode, user: User | nu
         if (user && user.role === 'student') {
             const hasSeenTour = localStorage.getItem(`tour_seen_${user.username}`);
             if (!hasSeenTour) {
-                setTimeout(() => startTour(), 1000); // Delay for UI load
+                setTimeout(() => startTour(), 1000);
             }
         }
     }, [user]);
