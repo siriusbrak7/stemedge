@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, Classroom, Assignment } from '../types';
 import { teacherDataService } from '../services/teacherDataService';
@@ -7,7 +6,9 @@ import {
     Users, BookOpen, Activity, AlertTriangle, 
     ChevronRight, TrendingUp, Clock, Search, 
     Download, Plus, ArrowLeft, MoreHorizontal,
-    Brain, FileBarChart, Calendar, ClipboardList, FlaskConical, Youtube
+    Brain, FileBarChart, Calendar, ClipboardList, 
+    FlaskConical, Youtube, CheckCircle, XCircle,
+    BarChart, PieChart, Award, Loader
 } from 'lucide-react';
 import AssignmentBuilder from './AssignmentBuilder';
 import ProgressReports from './ProgressReports';
@@ -25,12 +26,51 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [showBuilder, setShowBuilder] = useState(false);
+    const [isApproved, setIsApproved] = useState<boolean | null>(null);
+    const [stats, setStats] = useState({
+        totalStudents: 0,
+        avgProgress: 0,
+        assignmentsActive: 0,
+        atRiskCount: 0
+    });
+
+    // Check teacher approval status
+    useEffect(() => {
+        // Teachers need approval - check isApproved flag
+        if (user.role === 'teacher') {
+            // If using mock data or local dev, auto-approve for testing
+            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isDev && user.username.includes('test')) {
+                setIsApproved(true);
+            } else {
+                setIsApproved(user.isApproved || false);
+            }
+        } else {
+            setIsApproved(true); // Non-teachers always approved
+        }
+    }, [user]);
 
     const refreshData = async () => {
-        // Use ID if available (Supabase), else username (Demo)
         const identifier = user.id || user.username;
         const classData = await teacherDataService.fetchClassesAsync(identifier);
         setClasses(classData);
+        
+        // Calculate stats
+        const totalStudents = classData.reduce((acc, cls) => acc + cls.studentCount, 0);
+        const avgProgress = classData.length 
+            ? Math.round(classData.reduce((acc, cls) => acc + cls.averageProgress, 0) / classData.length) 
+            : 0;
+        const atRiskCount = classData.reduce((acc, cls) => 
+            acc + cls.students.filter(s => s.atRisk).length, 0
+        );
+        
+        setStats({
+            totalStudents,
+            avgProgress,
+            assignmentsActive: assignments.filter(a => a.status === 'published').length,
+            atRiskCount
+        });
+
         try {
             const asgData = await assignmentService.getAssignmentsForTeacher(identifier);
             setAssignments(asgData || []);
@@ -48,6 +88,43 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
         load();
     }, [user.id, user.username]);
 
+    // Show pending approval screen for unapproved teachers
+    if (isApproved === false) {
+        return (
+            <div className="min-h-screen pt-24 flex items-center justify-center px-4">
+                <div className="max-w-md w-full bg-slate-900 border border-amber-500/30 rounded-2xl p-8 text-center">
+                    <div className="w-20 h-20 bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Clock className="w-10 h-10 text-amber-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-3">Account Pending Approval</h2>
+                    <p className="text-slate-400 mb-6">
+                        Your teacher account is awaiting review by an administrator. 
+                        You'll receive access once approved. This usually takes 24-48 hours.
+                    </p>
+                    <div className="bg-slate-800/50 rounded-lg p-4 mb-6">
+                        <p className="text-sm text-slate-400 mb-2">Registration details:</p>
+                        <p className="text-white font-medium">{user.username}</p>
+                        <p className="text-xs text-slate-500 mt-2">Joined: {new Date().toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-sm text-slate-500">
+                        Questions? Contact <span className="text-cyan-400">admin@stemed.com</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen pt-24 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+                    <p className="text-slate-400 animate-pulse">Accessing Command Center...</p>
+                </div>
+            </div>
+        );
+    }
+
     const getHealthColor = (health: 'good' | 'average' | 'critical') => {
         switch(health) {
             case 'good': return 'text-green-400 border-green-500/30 bg-green-500/10';
@@ -58,8 +135,10 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
     };
 
     const handleDownloadReport = () => {
-        const text = "Student Name,Progress,Average Score\n" + 
-            (selectedClass ? selectedClass.students.map(s => `${s.name},${s.overallProgress}%,${s.averageScore}%`).join('\n') : "");
+        const text = "Student Name,Progress,Average Score,Status\n" + 
+            (selectedClass ? selectedClass.students.map(s => 
+                `${s.name},${s.overallProgress}%,${s.averageScore}%,${s.atRisk ? 'At Risk' : 'On Track'}`
+            ).join('\n') : "");
         
         const element = document.createElement("a");
         const file = new Blob([text], {type: 'text/plain'});
@@ -77,17 +156,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
         }
     };
 
-    if (loading) {
-         return (
-            <div className="min-h-screen pt-24 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
-                    <p className="text-slate-400 animate-pulse">Accessing Command Center...</p>
-                </div>
-            </div>
-        );
-    }
-
     if (showBuilder) {
         return (
             <AssignmentBuilder 
@@ -104,7 +172,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
     // --- VIEW 2: CLASS DETAIL (Selected Class) ---
     if (selectedClass) {
         
-        // Filter students based on search
         const filteredStudents = selectedClass.students.filter(s => 
             s.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
@@ -139,7 +206,7 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                             </button>
                         </div>
                     </div>
-                    {/* Stats Grid */}
+                    
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800">
                             <p className="text-slate-500 text-xs uppercase mb-1">Class Average</p>
@@ -188,25 +255,81 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                                                 <div className="text-xs text-slate-500">ID: {student.id.substring(0, 8)}...</div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                {student.atRisk ? <span className="text-red-400 bg-red-900/20 px-2 py-0.5 rounded text-xs border border-red-900/50">Needs Help</span> : <span className="text-slate-400">Active</span>}
+                                                {student.atRisk ? (
+                                                    <span className="text-red-400 bg-red-900/20 px-2 py-0.5 rounded text-xs border border-red-900/50 flex items-center gap-1 w-fit">
+                                                        <AlertTriangle className="w-3 h-3" /> Needs Help
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-400 flex items-center gap-1">
+                                                        <CheckCircle className="w-3 h-3 text-green-500/50" /> Active
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="w-24 h-1.5 bg-slate-800 rounded-full mb-1"><div className="h-full bg-cyan-500 rounded-full" style={{ width: `${student.overallProgress}%` }}></div></div>
-                                                <span className="text-xs text-slate-400">{student.overallProgress}% Complete</span>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-16 h-1.5 bg-slate-800 rounded-full">
+                                                        <div className={`h-full rounded-full ${student.overallProgress < 40 ? 'bg-red-500' : student.overallProgress < 70 ? 'bg-amber-500' : 'bg-green-500'}`} 
+                                                            style={{ width: `${student.overallProgress}%` }} />
+                                                    </div>
+                                                    <span className="text-xs text-slate-400">{student.overallProgress}%</span>
+                                                </div>
                                             </td>
-                                            <td className="px-6 py-4"><span className={`font-mono font-bold ${student.averageScore < 70 ? 'text-red-400' : 'text-white'}`}>{student.averageScore}%</span></td>
-                                            <td className="px-6 py-4 text-right"><button className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><MoreHorizontal className="w-4 h-4" /></button></td>
+                                            <td className="px-6 py-4">
+                                                <span className={`font-mono font-bold ${
+                                                    student.averageScore < 60 ? 'text-red-400' : 
+                                                    student.averageScore < 75 ? 'text-amber-400' : 
+                                                    'text-green-400'
+                                                }`}>
+                                                    {student.averageScore}%
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white">
+                                                    <MoreHorizontal className="w-4 h-4" />
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                    {/* Simplified Sidebar for Detail View */}
+                    
                     <div className="space-y-6">
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                <BarChart className="w-4 h-4 text-cyan-400" />
+                                Class Insights
+                            </h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-400">Struggling Students</span>
+                                    <span className="text-white font-bold">{strugglingStudents.length}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-400">Inactive (>5 days)</span>
+                                    <span className="text-white font-bold">{inactiveStudents.length}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-400">Ready for Enrichment</span>
+                                    <span className="text-white font-bold">{enrichmentStudents.length}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                             <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
-                            <button onClick={() => setShowBuilder(true)} className="w-full text-left px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 transition-all text-sm text-slate-300 flex items-center justify-between group">Manage Assignments <BookOpen className="w-4 h-4 text-slate-500 group-hover:text-white" /></button>
+                            <div className="space-y-2">
+                                <button onClick={() => setShowBuilder(true)} className="w-full text-left px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 transition-all text-sm text-slate-300 flex items-center justify-between group">
+                                    Create Assignment <BookOpen className="w-4 h-4 text-slate-500 group-hover:text-white" />
+                                </button>
+                                <button className="w-full text-left px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 transition-all text-sm text-slate-300 flex items-center justify-between group">
+                                    Message Class <Users className="w-4 h-4 text-slate-500 group-hover:text-white" />
+                                </button>
+                                <button className="w-full text-left px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 transition-all text-sm text-slate-300 flex items-center justify-between group">
+                                    Schedule Review <Calendar className="w-4 h-4 text-slate-500 group-hover:text-white" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -215,7 +338,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
     }
 
     // --- MAIN DASHBOARD VIEW ---
-
     return (
         <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             
@@ -227,22 +349,43 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                 </div>
                 <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1 overflow-x-auto">
                     {[
-                        { id: 'overview', label: 'Overview' },
-                        { id: 'assignments', label: 'Assignments' },
-                        { id: 'reports', label: 'Reports' },
-                        { id: 'videos', label: 'Videos' },
-                        { id: 'labs', label: 'Labs' }
+                        { id: 'overview', label: 'Overview', icon: <Activity className="w-4 h-4" /> },
+                        { id: 'assignments', label: 'Assignments', icon: <ClipboardList className="w-4 h-4" /> },
+                        { id: 'reports', label: 'Reports', icon: <FileBarChart className="w-4 h-4" /> },
+                        { id: 'videos', label: 'Videos', icon: <Youtube className="w-4 h-4" /> },
+                        { id: 'labs', label: 'Labs', icon: <FlaskConical className="w-4 h-4" /> }
                     ].map(tab => (
                         <button 
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all whitespace-nowrap ${
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${
                                 activeTab === tab.id ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-white'
                             }`}
                         >
+                            {tab.icon}
                             {tab.label}
                         </button>
                     ))}
+                </div>
+            </div>
+
+            {/* Stats Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                    <p className="text-slate-500 text-xs mb-1">Total Students</p>
+                    <p className="text-2xl font-bold text-white">{stats.totalStudents}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                    <p className="text-slate-500 text-xs mb-1">Avg Progress</p>
+                    <p className="text-2xl font-bold text-cyan-400">{stats.avgProgress}%</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                    <p className="text-slate-500 text-xs mb-1">Active Assignments</p>
+                    <p className="text-2xl font-bold text-purple-400">{stats.assignmentsActive}</p>
+                </div>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                    <p className="text-slate-500 text-xs mb-1">At Risk</p>
+                    <p className="text-2xl font-bold text-red-400">{stats.atRiskCount}</p>
                 </div>
             </div>
 
@@ -281,6 +424,14 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                                         </p>
                                     </div>
                                 </div>
+                                
+                                <div className="mt-4 flex gap-1">
+                                    <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="h-full bg-cyan-500" style={{ width: `${cls.averageProgress}%` }} />
+                                    </div>
+                                    <span className="text-xs text-slate-500">{cls.averageProgress}%</span>
+                                </div>
+                                
                                 <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <ChevronRight className="w-5 h-5 text-slate-400" />
                                 </div>
@@ -290,13 +441,15 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                         {/* Create Class Card */}
                         <div 
                             onClick={handleCreateClass}
-                            className="bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-900 hover:border-slate-700 transition-all min-h-[250px]"
+                            className="bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-900 hover:border-slate-700 transition-all min-h-[280px]"
                         >
-                            <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                            <div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center mb-4">
                                 <Plus className="w-6 h-6 text-slate-400" />
                             </div>
-                            <h3 className="text-lg font-bold text-white mb-1">Create Class</h3>
-                            <p className="text-slate-500 text-sm text-center">Add a new classroom to your dashboard.</p>
+                            <h3 className="text-lg font-bold text-white mb-2">Create Class</h3>
+                            <p className="text-slate-500 text-sm text-center max-w-[200px]">
+                                Add a new classroom to your dashboard
+                            </p>
                         </div>
                     </div>
                 </>
@@ -320,47 +473,74 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
 
                     <div className="space-y-4">
                         {assignments.length === 0 ? (
-                            <div className="text-center py-12 bg-slate-900 rounded-2xl border border-dashed border-slate-800">
-                                <p className="text-slate-400">No active assignments. Create one to get started.</p>
+                            <div className="text-center py-16 bg-slate-900 rounded-2xl border border-dashed border-slate-800">
+                                <ClipboardList className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                                <p className="text-slate-400 mb-2">No active assignments</p>
+                                <p className="text-sm text-slate-500 mb-6">Create your first assignment to get started</p>
+                                <button 
+                                    onClick={() => setShowBuilder(true)}
+                                    className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors inline-flex items-center gap-2"
+                                >
+                                    <Plus className="w-4 h-4" /> Create Assignment
+                                </button>
                             </div>
                         ) : (
-                            assignments.map(asg => (
-                                <div key={asg.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-purple-500/30 transition-all">
-                                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h3 className="font-bold text-white text-lg">{asg.title}</h3>
-                                                {asg.status === 'draft' && <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">DRAFT</span>}
-                                            </div>
-                                            <p className="text-sm text-slate-400 mb-2">
-                                                Classes: {asg.classIds.map(cid => classes.find(c => c.id === cid)?.name).join(', ')}
-                                            </p>
-                                            <div className="flex gap-4 text-xs font-mono text-slate-500">
-                                                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Due: {new Date(asg.dueDate).toLocaleDateString()}</span>
-                                                <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {asg.items.length} Items</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-6">
-                                            <div className="text-right">
-                                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Completion</p>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
-                                                        <div 
-                                                            className="h-full bg-cyan-500" 
-                                                            style={{ width: `${(asg.completionCount! / asg.totalStudents!) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-white font-bold text-sm">{asg.completionCount}/{asg.totalStudents}</span>
+                            assignments.map(asg => {
+                                const classNames = asg.classIds
+                                    .map(cid => classes.find(c => c.id === cid)?.name)
+                                    .filter(Boolean)
+                                    .join(', ');
+                                
+                                return (
+                                    <div key={asg.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-purple-500/30 transition-all">
+                                        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h3 className="font-bold text-white text-lg">{asg.title}</h3>
+                                                    {asg.status === 'draft' && (
+                                                        <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">
+                                                            DRAFT
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-slate-400 mb-2 line-clamp-1">
+                                                    {classNames || 'No classes assigned'}
+                                                </p>
+                                                <div className="flex flex-wrap gap-4 text-xs font-mono text-slate-500">
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="w-3 h-3" /> 
+                                                        Due: {new Date(asg.dueDate).toLocaleDateString()}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <BookOpen className="w-3 h-3" /> 
+                                                        {asg.items.length} Items
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
-                                                <MoreHorizontal className="w-5 h-5" />
-                                            </button>
+
+                                            <div className="flex items-center gap-6">
+                                                <div className="text-right">
+                                                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Completion</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="h-full bg-cyan-500" 
+                                                                style={{ width: `${((asg.completionCount || 0) / (asg.totalStudents || 1)) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-white font-bold text-sm">
+                                                            {asg.completionCount || 0}/{asg.totalStudents || 0}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+                                                    <MoreHorizontal className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
@@ -371,23 +551,33 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                 <ProgressReports user={user} />
             )}
 
-            {/* TAB: VIDEOS (New) */}
+            {/* TAB: VIDEOS */}
             {activeTab === 'videos' && (
                 <VideoManager user={user} />
             )}
 
-            {/* TAB: LABS (Placeholder) */}
+            {/* TAB: LABS */}
             {activeTab === 'labs' && (
-                <div className="animate-fade-in-up text-center py-20 bg-slate-900 border border-slate-800 rounded-2xl">
-                    <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <FlaskConical className="w-10 h-10 text-cyan-400" />
+                <div className="animate-fade-in-up">
+                    <div className="flex items-center gap-2 mb-6">
+                        <FlaskConical className="w-5 h-5 text-cyan-400" />
+                        <h2 className="text-xl font-bold text-white">Virtual Labs</h2>
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Virtual Lab Reports</h3>
-                    <p className="text-slate-400 max-w-md mx-auto mb-8">
-                        Detailed analytics on student lab performance, notebook entries, and identification accuracy will appear here.
-                    </p>
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-900/30 border border-purple-500/30 rounded-full text-purple-300 font-bold text-sm">
-                        Coming in Phase 2
+                    
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-cyan-500/30 transition-all">
+                                <div className="w-12 h-12 bg-cyan-900/30 rounded-xl flex items-center justify-center mb-4">
+                                    <FlaskConical className="w-6 h-6 text-cyan-400" />
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">Microscopy Lab {i}</h3>
+                                <p className="text-slate-400 text-sm mb-4">Cell structure identification and analysis</p>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-500">{12 + i} students completed</span>
+                                    <span className="text-cyan-400 font-medium">View →</span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
