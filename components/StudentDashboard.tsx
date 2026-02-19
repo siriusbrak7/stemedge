@@ -132,7 +132,7 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
         <div id="dashboard-container" className="max-w-6xl mx-auto">
             
             <div id="nova-trigger">
-                <TutorSidebar user={user} />
+                <TutorSidebar />
             </div>
             
             <BadgeNotification badge={newBadge} onClose={() => setNewBadge(null)} />

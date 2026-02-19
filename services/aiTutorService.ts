@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -20,12 +20,15 @@ export const aiTutorService = {
         try {
             const model = genAI.getGenerativeModel({ 
                 model: "gemini-2.5-flash",
-                systemInstruction: `You are Sirius, an enthusiastic STEM tutor for students aged 12-18. 
-                Your tone is encouraging, patient, and clear. You explain concepts step-by-step without 
-                being condescending. You encourage curiosity and critical thinking. You adapt your 
-                explanations to the student's level. You NEVER provide answers directly without 
-                guiding the student to discover it themselves. You use analogies from everyday life 
-                to explain complex scientific concepts.`
+                systemInstruction: {
+                    role: "system",
+                    parts: [{ text: `You are Sirius, an enthusiastic STEM tutor for students aged 12-18. 
+                    Your tone is encouraging, patient, and clear. You explain concepts step-by-step without 
+                    being condescending. You encourage curiosity and critical thinking. You adapt your 
+                    explanations to the student's level. You NEVER provide answers directly without 
+                    guiding the student to discover it themselves. You use analogies from everyday life 
+                    to explain complex scientific concepts.` }]
+                }
             });
 
             const context = topic 
@@ -55,8 +58,11 @@ export const aiTutorService = {
         try {
             const model = genAI.getGenerativeModel({ 
                 model: "gemini-2.5-flash",
-                systemInstruction: `You are Sirius, a helpful STEM tutor. Generate a SINGLE helpful hint 
-                for the question without giving away the full answer. The hint should guide thinking.`
+                systemInstruction: {
+                    role: "system",
+                    parts: [{ text: `You are Sirius, a helpful STEM tutor. Generate a SINGLE helpful hint 
+                    for the question without giving away the full answer. The hint should guide thinking.` }]
+                }
             });
 
             const result = await model.generateContent(

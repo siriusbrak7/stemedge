@@ -204,10 +204,7 @@ const LessonView: React.FC = () => {
         // Mark lesson as complete
         if (topicId && user?.id) {
             await studentDataService.updateProgress(user.id, topicId, 1);
-            const newBadges = await gamificationService.triggerBadgeCheck(user.id!);
-            if (newBadges.length > 0) {
-                console.log("Earned badges:", newBadges);
-            }
+            const newBadges = await gamificationService.triggerBadgeCheck(user.id!);`n            if (newBadges.length > 0) {`n                console.log(`"Earned badges:`", newBadges);`n            }
             setLessonCompleted(true);
         }
         setShowCheckpoint(false);
