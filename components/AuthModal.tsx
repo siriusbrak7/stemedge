@@ -18,7 +18,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [securityQuestion, setSecurityQuestion] = useState<string>(SECURITY_QUESTIONS[0]);
   const [securityAnswer, setSecurityAnswer] = useState('');
-  const [role, setRole] = useState<'student' | 'teacher'>('student');
+  const [role] = useState<"student">("student");
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetStep, setResetStep] = useState<'ask' | 'answer' | 'new'>('ask');
@@ -242,7 +242,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
                 >
                   <option value="student">Student</option>
-                  <option value="teacher">Teacher</option>
+                  
                 </select>
               </div>
               <div>
