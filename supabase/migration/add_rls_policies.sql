@@ -148,4 +148,4 @@ CREATE POLICY "Admins have full access to all tables" ON users
         auth.uid() IN (SELECT id FROM users WHERE role = 'admin' AND "isApproved" = true)
     );
 
--- Note: You'll need to create this policy for each table or rely on the per-table policies above
+-- Note: You'll need to create this policy for each table or rely on the per-table policies above--
