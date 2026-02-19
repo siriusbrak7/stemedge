@@ -1,8 +1,7 @@
-
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DashboardData, Topic, UserTopicProgress } from '../types';
 
-// Static curriculum definition (could also be in DB)
+// Static curriculum definition
 const BIOLOGY_CURRICULUM: Topic[] = [
     { id: 'cell_biology', title: 'Cellular Biology', description: 'Understand the building blocks of life.', iconName: 'microscope', totalLessons: 12, difficulty: 'Beginner' },
     { id: 'plant_nutrition', title: 'Plant Nutrition', description: 'Photosynthesis and leaf structure.', iconName: 'leaf', totalLessons: 15, difficulty: 'Intermediate' },
@@ -14,7 +13,7 @@ const BIOLOGY_CURRICULUM: Topic[] = [
 ];
 
 export const studentDataService = {
-    getDashboardData: async (userIdOrUsername: string): Promise<DashboardData> => {
+    getDashboardData: async (userId: string): Promise<DashboardData> => {
         let progressMap: Record<string, UserTopicProgress> = {};
 
         // 1. Try Supabase Network
@@ -53,15 +52,15 @@ export const studentDataService = {
         }
 
         // 2. Fallback Cache / Local Demo Data
-        const cacheKey = `dashboard_${userIdOrUsername}`;
+        const cacheKey = `dashboard_${userId}`;
         const cached = localStorage.getItem(cacheKey);
         
         if (cached) {
             progressMap = JSON.parse(cached);
         } else {
             // SEED DEMO DATA
-            const lowerId = userIdOrUsername.toLowerCase();
-            if (lowerId === 'annabel') {
+            const lowerId = userId.toLowerCase();
+            if (lowerId.includes('annabel')) {
                 progressMap = {
                     'cell_biology': { topicId: 'cell_biology', completedLessons: 8, quizScore: 85, lastAccessed: Date.now() - 3600000, isCompleted: false },
                     'plant_nutrition': { topicId: 'plant_nutrition', completedLessons: 2, quizScore: undefined, lastAccessed: Date.now() - 86400000, isCompleted: false }
@@ -76,7 +75,7 @@ export const studentDataService = {
         };
     },
 
-    updateProgress: async (userIdOrUsername: string, topicId: string, lessonsCompleted: number, quizScore?: number) => {
+    updateProgress: async (userId: string, topicId: string, lessonsCompleted: number, quizScore?: number) => {
         const topic = BIOLOGY_CURRICULUM.find(t => t.id === topicId);
         if (!topic) return;
 
@@ -101,7 +100,7 @@ export const studentDataService = {
         }
 
         // 2. Local Cache Update
-        const cacheKey = `dashboard_${userIdOrUsername}`;
+        const cacheKey = `dashboard_${userId}`;
         const cached = localStorage.getItem(cacheKey);
         const map = cached ? JSON.parse(cached) : {};
         

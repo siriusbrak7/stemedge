@@ -13,8 +13,7 @@ import TutorSidebar from './TutorSidebar';
 import VirtualLabsList from './VirtualLabsList';
 import StreakCounter from './gamification/StreakCounter'; 
 import AchievementsSection from './gamification/AchievementsSection'; 
-import BadgeNotification from './gamification/BadgeNotification';
-import QuizLauncher from './QuizLauncher';
+import BadgeNotification from './gamification/BadgeNotification'; 
 
 interface Props {
     user: User;
@@ -36,10 +35,12 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
     // UI States
     const [expandedAssignmentId, setExpandedAssignmentId] = useState<string | null>(null);
 
+    // Initial Data Fetch
     useEffect(() => {
         let isMounted = true;
 
         const fetchData = async () => {
+            // Use user.id for service calls (UUID), but display name uses username
             const dashboardData = await studentDataService.getDashboardData(user.id!);
             const asgData = await assignmentService.getStudentAssignments(user.id!);
             
@@ -89,10 +90,6 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
         }
     };
 
-    const handleStartQuiz = (topicId: string, questionCount: number | 'All', difficulty?: string) => {
-        navigate(`/practice/${topicId}?count=${questionCount}&difficulty=${difficulty || 'all'}`);
-    };
-
     if (loading) {
         return (
             <div className="h-full flex items-center justify-center">
@@ -106,6 +103,7 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
 
     if (!data) return null;
 
+    // --- LOGIC ---
     const getProgress = (topicId: string) => data.progress[topicId];
     const allCompleted = data.topics.every(t => getProgress(t.id)?.isCompleted);
     const featuredTopic = data.topics.find(t => {
@@ -366,9 +364,6 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
                     </div>
                 </div>
             </div>
-
-            {/* QUIZ LAUNCHER */}
-            <QuizLauncher onStartQuiz={handleStartQuiz} />
 
             {/* VIRTUAL LABS */}
             <section id="labs" className="mb-12 animate-fade-in-up">
