@@ -238,7 +238,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <label className="block text-sm font-medium text-slate-300 mb-1">I am a</label>
                 <select
                   value={role}
-                  onChange={(e) => setRole(e.target.value as 'student' | 'teacher')}
+                  
                   className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
                 >
                   <option value="student">Student</option>
