@@ -1,6 +1,9 @@
 import React, { useEffect } from 'react';
 import { Quiz } from '../types';
 import { useQuiz } from '../hooks/useQuiz';
+import { useUser } from '../contexts/UserContext';
+import { studentDataService } from '../services/studentDataService';
+import { gamificationService } from '../services/gamificationService';
 import { quizService } from '../services/quizData';
 import QuizResults from './QuizResults';
 import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle, XCircle, Star, Clock, Tag } from 'lucide-react';
@@ -12,6 +15,7 @@ interface Props {
 }
 
 const QuizPlayer: React.FC<Props> = ({ quizId, customQuiz, onClose }) => {
+    const { user } = useUser();
     let quiz = customQuiz;
     
     if (!quiz && quizId) {
