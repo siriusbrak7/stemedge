@@ -3,14 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { Filter, ChevronDown, Play } from 'lucide-react';
 
 interface Props {
-    onStartQuiz: (topicId: string, questionCount: number, difficulty?: string) => void;
+    onStartQuiz: (topicId: string, questionCount: number | 'All', difficulty?: string) => void;
 }
 
 const TOPICS = [
-    { id: 'cell_biology', name: 'Cell Biology', difficulty: ['Beginner', 'Intermediate', 'Advanced'] },
+    { id: 'cell_biology', name: 'Cellular Biology', difficulty: ['Beginner', 'Intermediate', 'Advanced'] },
     { id: 'plant_nutrition', name: 'Plant Nutrition', difficulty: ['Beginner', 'Intermediate'] },
-    { id: 'enzymes', name: 'Enzymes', difficulty: ['Intermediate', 'Advanced'] },
-    { id: 'inheritance', name: 'Genetics', difficulty: ['Advanced'] },
+    { id: 'human_body', name: 'Human Physiology', difficulty: ['Beginner', 'Intermediate'] },
+    { id: 'enzymes', name: 'Enzymes & Metabolism', difficulty: ['Intermediate', 'Advanced'] },
+    { id: 'inheritance', name: 'Genetics & Heredity', difficulty: ['Advanced'] },
+    { id: 'evolution', name: 'Evolution', difficulty: ['Advanced'] },
     { id: 'ecology', name: 'Ecology', difficulty: ['Beginner', 'Intermediate'] }
 ];
 
@@ -65,7 +67,7 @@ const QuizLauncher: React.FC<Props> = ({ onStartQuiz }) => {
                     {/* Difficulty Selector */}
                     <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Difficulty (Optional)</label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                             <button
                                 onClick={() => setSelectedDifficulty('')}
                                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
@@ -98,7 +100,7 @@ const QuizLauncher: React.FC<Props> = ({ onStartQuiz }) => {
                         <div className="flex gap-2 flex-wrap">
                             {QUESTION_COUNTS.map(count => (
                                 <button
-                                    key={count}
+                                    key={count.toString()}
                                     onClick={() => setSelectedCount(count as number | "All")}
                                     className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
                                         selectedCount === count 
