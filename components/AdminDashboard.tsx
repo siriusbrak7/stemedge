@@ -52,7 +52,7 @@ const AdminDashboard: React.FC = () => {
             // Fetch all teachers
             const { data: allTeachersData } = await supabase
                 .from('users')
-                .select('id, username, email, created_at, securityQuestion, isApproved, last_sign_in_at')
+                .select('id, username, email, created_at, securityQuestion, is_approved, last_sign_in_at')
                 .eq('role', 'teacher')
                 .order('created_at', { ascending: false });
             
@@ -61,7 +61,7 @@ const AdminDashboard: React.FC = () => {
                 .from('users')
                 .select('id, username, email, created_at, securityQuestion, last_sign_in_at')
                 .eq('role', 'teacher')
-                .eq('isApproved', false)
+                .eq('is_approved', false)
                 .order('created_at', { ascending: false });
                 
             // Fetch approved teachers
@@ -69,7 +69,7 @@ const AdminDashboard: React.FC = () => {
                 .from('users')
                 .select('id, username, email, created_at, securityQuestion, last_sign_in_at')
                 .eq('role', 'teacher')
-                .eq('isApproved', true)
+                .eq('is_approved', true)
                 .order('created_at', { ascending: false });
             
             // Fetch student count
@@ -109,7 +109,7 @@ const AdminDashboard: React.FC = () => {
     const approveTeacher = async (teacherId: string) => {
         const { error } = await supabase
             .from('users')
-            .update({ isApproved: true })
+            .update({ is_approved: true })
             .eq('id', teacherId);
             
         if (!error) {
