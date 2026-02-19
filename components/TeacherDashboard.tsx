@@ -34,11 +34,8 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
         atRiskCount: 0
     });
 
-    // Check teacher approval status
     useEffect(() => {
-        // Teachers need approval - check isApproved flag
         if (user.role === 'teacher') {
-            // If using mock data or local dev, auto-approve for testing
             const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             if (isDev && user.username.includes('test')) {
                 setIsApproved(true);
@@ -46,7 +43,7 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                 setIsApproved(user.isApproved || false);
             }
         } else {
-            setIsApproved(true); // Non-teachers always approved
+            setIsApproved(true);
         }
     }, [user]);
 
@@ -55,7 +52,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
         const classData = await teacherDataService.fetchClassesAsync(identifier);
         setClasses(classData);
         
-        // Calculate stats
         const totalStudents = classData.reduce((acc, cls) => acc + cls.studentCount, 0);
         const avgProgress = classData.length 
             ? Math.round(classData.reduce((acc, cls) => acc + cls.averageProgress, 0) / classData.length) 
@@ -88,7 +84,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
         load();
     }, [user.id, user.username]);
 
-    // Show pending approval screen for unapproved teachers
     if (isApproved === false) {
         return (
             <div className="min-h-screen pt-24 flex items-center justify-center px-4">
@@ -169,7 +164,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
         );
     }
 
-    // --- VIEW 2: CLASS DETAIL (Selected Class) ---
     if (selectedClass) {
         
         const filteredStudents = selectedClass.students.filter(s => 
@@ -307,7 +301,7 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                                     <span className="text-white font-bold">{strugglingStudents.length}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-400">Inactive (>5 days)</span>
+                                    <span className="text-slate-400">Inactive (greater than 5 days)</span>
                                     <span className="text-white font-bold">{inactiveStudents.length}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
@@ -337,11 +331,9 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
         );
     }
 
-    // --- MAIN DASHBOARD VIEW ---
     return (
         <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             
-            {/* Header */}
             <div className="flex justify-between items-end mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-2">Command Center</h1>
@@ -369,7 +361,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                 </div>
             </div>
 
-            {/* Stats Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                     <p className="text-slate-500 text-xs mb-1">Total Students</p>
@@ -389,11 +380,9 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                 </div>
             </div>
 
-            {/* TAB: OVERVIEW */}
             {activeTab === 'overview' && (
                 <>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        {/* Class Cards */}
                         {classes.map((cls) => (
                             <div 
                                 key={cls.id} 
@@ -438,7 +427,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                             </div>
                         ))}
                          
-                        {/* Create Class Card */}
                         <div 
                             onClick={handleCreateClass}
                             className="bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-900 hover:border-slate-700 transition-all min-h-[280px]"
@@ -455,7 +443,6 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                 </>
             )}
 
-            {/* TAB: ASSIGNMENTS */}
             {activeTab === 'assignments' && (
                 <div className="animate-fade-in-up">
                     <div className="flex justify-between items-center mb-6">
@@ -546,17 +533,14 @@ const TeacherDashboard: React.FC<Props> = ({ user }) => {
                 </div>
             )}
 
-            {/* TAB: REPORTS */}
             {activeTab === 'reports' && (
                 <ProgressReports user={user} />
             )}
 
-            {/* TAB: VIDEOS */}
             {activeTab === 'videos' && (
                 <VideoManager user={user} />
             )}
 
-            {/* TAB: LABS */}
             {activeTab === 'labs' && (
                 <div className="animate-fade-in-up">
                     <div className="flex items-center gap-2 mb-6">

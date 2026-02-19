@@ -41,13 +41,13 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
         let isMounted = true;
 
         const fetchData = async () => {
-            const dashboardData = await studentDataService.getDashboardData(user.username);
-            const asgData = await assignmentService.getStudentAssignments(user.username);
+            const dashboardData = await studentDataService.getDashboardData(user.id);
+            const asgData = await assignmentService.getStudentAssignments(user.id);
             
             // Initialize Gamification
-            const currentStreak = gamificationService.updateStreak(user.username);
+            const currentStreak = gamificationService.updateStreak(user.id);
             const badges = gamificationService.getAllBadges();
-            const earned = gamificationService.getUserBadges(user.username);
+            const earned = gamificationService.getUserBadges(user.id);
 
             if (isMounted) {
                 setData(dashboardData);
@@ -75,9 +75,9 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
     }, [user.username]); 
 
     const checkBadges = async () => {
-        const earned = await gamificationService.checkForNewBadges(user.username);
+        const earned = await gamificationService.checkForNewBadges(user.id);
         if (earned.length > 0) {
-            setUserBadges(gamificationService.getUserBadges(user.username)); 
+            setUserBadges(gamificationService.getUserBadges(user.id)); 
             setNewBadge(earned[0]); 
         }
     };

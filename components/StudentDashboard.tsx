@@ -41,13 +41,13 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
         let isMounted = true;
 
         const fetchData = async () => {
-            const dashboardData = await studentDataService.getDashboardData(user.id);
-            const asgData = await assignmentService.getStudentAssignments(user.id);
+            const dashboardData = await studentDataService.getDashboardData(user.id!);
+            const asgData = await assignmentService.getStudentAssignments(user.id!);
             
             // Initialize Gamification
-            const currentStreak = gamificationService.updateStreak(user.id);
+            const currentStreak = gamificationService.updateStreak(user.id!);
             const badges = gamificationService.getAllBadges();
-            const earned = gamificationService.getUserBadges(user.id);
+            const earned = gamificationService.getUserBadges(user.id!);
 
             if (isMounted) {
                 setData(dashboardData);
@@ -72,18 +72,18 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
-    }, [user.username]); 
+    }, [user.id!]); 
 
     const checkBadges = async () => {
-        const earned = await gamificationService.checkForNewBadges(user.id);
+        const earned = await gamificationService.checkForNewBadges(user.id!);
         if (earned.length > 0) {
-            setUserBadges(gamificationService.getUserBadges(user.id)); 
+            setUserBadges(gamificationService.getUserBadges(user.id!)); 
             setNewBadge(earned[0]); 
         }
     };
 
     const handleAssignmentItemClick = (assignmentId: string, item: { id: string, type: 'lesson' | 'quiz', contentId: string }) => {
-        assignmentService.updateStudentProgress(user.username, assignmentId, item.id, false); 
+        assignmentService.updateStudentProgress(user.id!, assignmentId, item.id, false); 
 
         if (item.type === 'lesson') {
             navigate(`/lesson/${item.contentId}`);
@@ -138,7 +138,7 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
             <div className="flex justify-between items-end mb-10">
                 <div>
                     <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                        Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">{user.username.split('@')[0]}</span>
+                        Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">{user.id!.split('@')[0]}</span>
                     </h1>
                     <p className="text-slate-400">
                         {allCompleted 
@@ -372,7 +372,7 @@ const StudentDashboard: React.FC<Props> = ({ user }) => {
                     <h2 className="text-xl font-bold text-white tracking-wide">Virtual Labs</h2>
                 </div>
                 <VirtualLabsList 
-                    studentId={user.username}
+                    studentId={user.id!}
                     onStartLab={(lab) => navigate(`/lab/${lab.id}`)} 
                 />
             </section>
