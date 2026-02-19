@@ -78,7 +78,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       role,
       securityQuestion,
       securityAnswer,
-      isApproved: role === 'student',
+      isApproved: role === 'student' ? true : false,
     });
     setLoading(false);
     if (result.error) {
