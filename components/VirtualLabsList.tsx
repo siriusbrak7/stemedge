@@ -23,22 +23,27 @@ const VirtualLabsList: React.FC<Props> = ({ studentId, onStartLab }) => {
         return attempt.isCompleted ? 'completed' : 'in_progress';
     };
 
+    // All labs are enabled – we build the set from the loaded labs.
+    // (If you need to manually control which labs are available later,
+    // you can replace this with a hardcoded Set of lab IDs.)
+    const enabledLabIds = new Set(labs.map(lab => lab.id));
+
     return (
         <div className="animate-fade-in-up">
             <div className="grid md:grid-cols-2 gap-6">
                 {labs.map(lab => {
                     const status = getLabStatus(lab.id);
-                    const ENABLED_LABS = lab.id === 'lab-cell-staining'; // Only enable this one for Phase 1
+                    const isEnabled = enabledLabIds.has(lab.id); // true for all loaded labs
 
                     return (
                         <div 
                             key={lab.id}
                             className={`relative bg-slate-900 border rounded-2xl p-6 transition-all ${
-                                isCellLab 
+                                isEnabled 
                                     ? 'border-slate-800 hover:border-purple-500/50 hover:bg-slate-900/80 group cursor-pointer' 
                                     : 'border-slate-800 opacity-60 cursor-not-allowed'
                             }`}
-                            onClick={() => isCellLab && onStartLab(lab)}
+                            onClick={() => isEnabled && onStartLab(lab)}
                         >
                             {/* Status Badge */}
                             <div className="absolute top-4 right-4">
@@ -47,7 +52,7 @@ const VirtualLabsList: React.FC<Props> = ({ studentId, onStartLab }) => {
                             </div>
 
                             <div className="flex items-start gap-4 mb-4">
-                                <div className={`p-3 rounded-xl ${isCellLab ? 'bg-purple-900/20 text-purple-400' : 'bg-slate-800 text-slate-500'}`}>
+                                <div className={`p-3 rounded-xl ${isEnabled ? 'bg-purple-900/20 text-purple-400' : 'bg-slate-800 text-slate-500'}`}>
                                     <FlaskConical className="w-6 h-6" />
                                 </div>
                                 <div>
@@ -68,9 +73,9 @@ const VirtualLabsList: React.FC<Props> = ({ studentId, onStartLab }) => {
 
                             <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-800">
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                    {isCellLab ? 'Available' : 'Coming Soon'}
+                                    {isEnabled ? 'Available' : 'Coming Soon'}
                                 </span>
-                                {isCellLab && (
+                                {isEnabled && (
                                     <button className="flex items-center gap-2 text-sm font-bold text-cyan-400 group-hover:text-white transition-colors">
                                         {status === 'not_started' ? 'Enter Lab' : 'Continue'} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </button>
