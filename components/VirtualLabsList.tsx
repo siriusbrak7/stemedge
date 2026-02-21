@@ -28,7 +28,7 @@ const VirtualLabsList: React.FC<Props> = ({ studentId, onStartLab }) => {
             <div className="grid md:grid-cols-2 gap-6">
                 {labs.map(lab => {
                     const status = getLabStatus(lab.id);
-                    const isCellLab = lab.id === 'lab-cell-staining'; // Only enable this one for Phase 1
+                    const ENABLED_LABS = lab.id === 'lab-cell-staining'; // Only enable this one for Phase 1
 
                     return (
                         <div 
