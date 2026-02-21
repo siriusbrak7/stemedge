@@ -28,20 +28,20 @@ const Homepage: React.FC = () => {
                             <div>
                                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 text-sm font-medium mb-6">
                                     <Sparkles className="w-4 h-4" />
-                                    <span>Sirius AI Engine</span>
+                                    <span>Sirius</span>
                                 </div>
                                 <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                                    Meet Sirius, Your Cosmic Guide
+                                    Meet Sirius, Your Learning Assistant
                                 </h2>
                                 <p className="text-slate-400 text-lg mb-8 leading-relaxed">
-                                    Not just a chatbot. Sirius remembers your learning style, tracks your progress across modules, 
+                                    Sirius remembers your learning style, tracks your progress across modules, 
                                     and illuminates the path to mastery.
                                 </p>
                                 <button 
                                     onClick={() => setIsAuthOpen(true)}
                                     className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold transition-all hover:scale-105 shadow-lg shadow-purple-900/50"
                                 >
-                                    Access Tutor <ArrowRight className="w-4 h-4" />
+                                    Access Sirius <ArrowRight className="w-4 h-4" />
                                 </button>
                             </div>
                             <div className="relative flex justify-center">

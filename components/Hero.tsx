@@ -21,19 +21,19 @@ const Hero: React.FC<HeroProps> = ({ onOpenAuth, onWatchDemo }) => {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
           </span>
-          <span className="text-slate-300 text-xs font-semibold tracking-wide uppercase">AI-Powered Learning Engine</span>
+          <span className="text-slate-300 text-xs font-semibold tracking-wide uppercase">Enhanced Learning Experience</span>
         </div>
         
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-6 leading-tight">
-          Explore the <br />
+          Learn Science at <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 drop-shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-            Universe of Knowledge
+            Warp Speed
           </span>
         </h1>
         
         <p className="mt-4 max-w-2xl mx-auto text-xl text-slate-400 mb-10 leading-relaxed">
-          StemEdge is your launchpad for mastering Science, Technology, Engineering, and Math. 
-          Powered by AI, designed for the stars of tomorrow.
+          StemEdge is your launchpad for mastering Science. 
+          Powered by Sirius, designed for the stars of tomorrow.
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20">
@@ -53,32 +53,8 @@ const Hero: React.FC<HeroProps> = ({ onOpenAuth, onWatchDemo }) => {
             Watch Demo
           </button>
         </div>
-
-        {/* Floating Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-           <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm flex flex-col items-center hover:border-purple-500/30 transition-colors">
-                <Users className="w-6 h-6 text-purple-400 mb-2" />
-                <span className="text-2xl font-bold text-white">10k+</span>
-                <span className="text-slate-500 text-xs uppercase tracking-wider">Active Learners</span>
-           </div>
-           <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm flex flex-col items-center hover:border-cyan-500/30 transition-colors">
-                <Brain className="w-6 h-6 text-cyan-400 mb-2" />
-                <span className="text-2xl font-bold text-white">500k+</span>
-                <span className="text-slate-500 text-xs uppercase tracking-wider">Concepts Mastered</span>
-           </div>
-           <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm flex flex-col items-center hover:border-pink-500/30 transition-colors">
-                <Activity className="w-6 h-6 text-pink-400 mb-2" />
-                <span className="text-2xl font-bold text-white">1M+</span>
-                <span className="text-slate-500 text-xs uppercase tracking-wider">AI Interactions</span>
-           </div>
-           <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm flex flex-col items-center hover:border-yellow-500/30 transition-colors">
-                <Star className="w-6 h-6 text-yellow-400 mb-2 fill-yellow-400" />
-                <span className="text-2xl font-bold text-white">4.9/5</span>
-                <span className="text-slate-500 text-xs uppercase tracking-wider">User Rating</span>
-           </div>
         </div>
       </div>
-    </div>
   );
 };
 
