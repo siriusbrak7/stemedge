@@ -33,3 +33,70 @@ body {
     90% { opacity: 1; }
     100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
 }
+
+/* Old Android fallback – disable heavy effects */
+.old-android .backdrop-blur-sm,
+.old-android .backdrop-blur,
+.old-android .backdrop-blur-md,
+.old-android .backdrop-blur-lg,
+.old-android .backdrop-blur-xl,
+.old-android .backdrop-blur-2xl {
+  backdrop-filter: none !important;
+  background-color: rgba(0, 0, 0, 0.8) !important;
+}
+
+.old-android .animate-spin,
+.old-android .animate-pulse,
+.old-android .animate-bounce,
+.old-android .animate-ping,
+.old-android .animate-fade-in,
+.old-android .animate-fade-in-up {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.old-android .bg-gradient-to-r,
+.old-android .bg-gradient-to-br,
+.old-android .bg-gradient-to-t,
+.old-android .bg-gradient-to-l {
+  background-image: none !important;
+  background-color: #1e293b !important;
+}
+
+.old-android .shadow-2xl,
+.old-android .shadow-xl,
+.old-android .shadow-lg {
+  box-shadow: none !important;
+  border: 1px solid #334155 !important;
+}
+
+.old-android .blur-3xl,
+.old-android .blur-2xl,
+.old-android .blur-xl,
+.old-android .blur-lg {
+  display: none !important;
+}
+
+.old-android .backdrop-blur,
+.old-android .backdrop-filter {
+  backdrop-filter: none !important;
+}
+
+.old-android [style*="backdrop-filter"] {
+  backdrop-filter: none !important;
+  background-color: #0f172a !important;
+}
+
+/* Ensure text remains readable */
+.old-android body {
+  background-color: #0b1120;
+}
+
+.old-android .bg-slate-900 {
+  background-color: #0f172a;
+}
+
+.old-android .border-slate-800 {
+  border-color: #334155;
+}
