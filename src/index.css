@@ -1,0 +1,292 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-bg: #05070A;
+  --color-brand-sidebar: #0A0C14;
+  --color-brand-accent: #22D3EE;
+  --color-brand-border: #1E293B;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-bg text-slate-200 antialiased;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   CUSTOM RANGE SLIDERS
+   ───────────────────────────────────────────── */
+.stem-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--slider-color, #22D3EE) 0%,
+    var(--slider-color, #22D3EE) var(--slider-pct, 50%),
+    #1e293b var(--slider-pct, 50%),
+    #1e293b 100%
+  );
+  outline: none;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.stem-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 0 3px var(--slider-color, #22D3EE), 0 0 12px var(--slider-color, #22D3EE);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+.stem-slider::-webkit-slider-thumb:hover,
+.stem-slider:active::-webkit-slider-thumb {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 4px var(--slider-color, #22D3EE), 0 0 24px var(--slider-color, #22D3EE);
+}
+
+.stem-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: white;
+  box-shadow: 0 0 0 3px var(--slider-color, #22D3EE), 0 0 12px var(--slider-color, #22D3EE);
+  cursor: pointer;
+}
+
+/* Colour variants */
+.stem-slider-cyan   { --slider-color: #22D3EE; }
+.stem-slider-orange { --slider-color: #f59e0b; }
+.stem-slider-pink   { --slider-color: #fb7185; }
+.stem-slider-green  { --slider-color: #22c55e; }
+.stem-slider-purple { --slider-color: #a78bfa; }
+.stem-slider-yellow { --slider-color: #facc15; }
+
+/* ─────────────────────────────────────────────
+   UTILITY — SCROLLBAR
+   ───────────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ─────────────────────────────────────────────
+   PERSPECTIVE (for 3-D card flips)
+   ───────────────────────────────────────────── */
+.perspective-1000 { perspective: 1000px; }
+
+/* ─────────────────────────────────────────────
+   KEYFRAMES
+   ───────────────────────────────────────────── */
+
+/* Flowing dash stroke for process arrows */
+@keyframes stemedge-flow {
+  0%   { stroke-dashoffset: 36; }
+  100% { stroke-dashoffset: 0; }
+}
+
+/* Gentle vertical float */
+@keyframes stemedge-float {
+  0%, 100% { transform: translateY(0);    opacity: 0.75; }
+  50%       { transform: translateY(-10px); opacity: 1;    }
+}
+
+/* Soft size pulse */
+@keyframes stemedge-pulse-soft {
+  0%, 100% { transform: scale(1);    opacity: 0.7; }
+  50%       { transform: scale(1.08); opacity: 1;   }
+}
+
+/* Shimmer sweep — for skeleton loading states */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+/* Draw SVG line from zero */
+@keyframes draw-line {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* Radial glow pulse — for active sim indicators */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px  var(--glow-color, #22D3EE); }
+  50%       { box-shadow: 0 0 24px var(--glow-color, #22D3EE); }
+}
+
+/* Horizontal scan-line sweep */
+@keyframes scan-line {
+  0%   { transform: translateY(-100%); opacity: 0.6; }
+  100% { transform: translateY(100vh); opacity: 0;   }
+}
+
+/* Particle drift upward */
+@keyframes particle-up {
+  0%   { transform: translateY(0)    scale(1);   opacity: 0.8; }
+  100% { transform: translateY(-60px) scale(0.3); opacity: 0;   }
+}
+
+/* Slide-in from bottom (for phase transitions) */
+@keyframes slide-up-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* Tab underline slide */
+@keyframes tab-underline {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* Shake (for wrong answer) */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+
+/* Bounce in (for correct answer badge) */
+@keyframes bounce-in {
+  0%   { transform: scale(0);    opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────
+   ANIMATION UTILITY CLASSES
+   ───────────────────────────────────────────── */
+.process-flow-line {
+  stroke-dasharray: 8 10;
+  animation: stemedge-flow 1.6s linear infinite;
+}
+
+.process-float {
+  animation: stemedge-float 2.4s ease-in-out infinite;
+}
+
+.process-pulse-soft {
+  animation: stemedge-pulse-soft 1.8s ease-in-out infinite;
+}
+
+.anim-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  background-size: 400px 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+.anim-particle-up {
+  animation: particle-up 0.9s ease-out forwards;
+}
+
+.anim-slide-up-in {
+  animation: slide-up-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.anim-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+.anim-bounce-in {
+  animation: bounce-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.anim-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────
+   SVG DRAW-ON UTILITY
+   Apply to a <polyline> or <path> that has
+   stroke-dasharray set to its own length via JS
+   ───────────────────────────────────────────── */
+.svg-draw-on {
+  animation: draw-line 1.2s ease-out forwards;
+}
+
+/* ─────────────────────────────────────────────
+   INTERACTIVE CARD GLOW HOVER
+   ───────────────────────────────────────────── */
+.interactive-card {
+  transition: box-shadow 0.25s, border-color 0.25s, transform 0.2s;
+}
+
+.interactive-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.35);
+  box-shadow: 0 0 30px rgba(34, 211, 238, 0.12);
+}
+
+/* ─────────────────────────────────────────────
+   TAB ACTIVE INDICATOR (sliding underline)
+   ───────────────────────────────────────────── */
+.tab-active-indicator {
+  position: relative;
+}
+
+.tab-active-indicator::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--tab-color, #22D3EE);
+  border-radius: 9999px;
+  animation: tab-underline 0.25s ease-out forwards;
+  box-shadow: 0 0 8px var(--tab-color, #22D3EE);
+}
+
+/* ─────────────────────────────────────────────
+   SCAN LINE OVERLAY (for loading frames)
+   ───────────────────────────────────────────── */
+.scan-line-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.6), transparent);
+  animation: scan-line 2s linear infinite;
+  pointer-events: none;
+}
+
+/* ─────────────────────────────────────────────
+   REDUCED MOTION
+   ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .process-flow-line,
+  .process-float,
+  .process-pulse-soft,
+  .anim-shimmer,
+  .anim-particle-up,
+  .anim-slide-up-in,
+  .anim-shake,
+  .anim-bounce-in,
+  .anim-glow-pulse,
+  .svg-draw-on,
+  .scan-line-overlay::before {
+    animation: none;
+  }
+
+  .stem-slider::-webkit-slider-thumb {
+    transition: none;
+  }
+
+  .interactive-card:hover {
+    transform: none;
+  }
+}
