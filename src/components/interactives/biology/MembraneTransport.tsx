@@ -1,65 +1,111 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { Play, RotateCcw, Eye, Target, GraduationCap } from 'lucide-react';
-import { CELL_MISCONCEPTIONS } from '../../../data/misconceptions/biology';
+import { Play, RotateCcw, Eye, Target, GraduationCap, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 
 type ViewMode = 'explore' | 'quiz' | 'learn';
 type SimMode = 'diffusion' | 'osmosis' | 'active-transport';
+type ChallengePhase = 'goal' | 'predict' | 'observe' | 'reflect';
 
-interface ParticleData {
-  left: number;
-  right: number;
-  waterLeft: number;
-  waterRight: number;
+interface Challenge {
+  id: string;
+  mode: SimMode;
+  goal: string;
+  setup: { concentration: number; mode: SimMode };
+  question: string;
+  predictionOptions: string[];
+  correctPrediction: number;
+  explanation: string;
+  misconceptionId?: string;
 }
 
-interface Particle {
-  x: number; y: number; vx: number; vy: number;
-  type: 'solute' | 'water' | 'atp';
-  side: 'left' | 'right';
-  bound: boolean;
-  carrierIdx: number;
-}
-
-interface CarrierProtein {
-  y: number;
-  state: 'idle' | 'open-left' | 'grabbing' | 'transporting' | 'open-right' | 'releasing';
-  timer: number;
-  boundParticleIdx: number;
-  atpGlow: number;
-  pumpPhase: number; // 0-1 animation phase for pump shape
-  conformationAngle: number; // rotation for shape change
-}
+const CHALLENGES: Challenge[] = [
+  {
+    id: 'c1',
+    mode: 'diffusion',
+    goal: 'Make the particles spread evenly on both sides',
+    setup: { concentration: 85, mode: 'diffusion' },
+    question: 'What must happen for the particles to reach equilibrium?',
+    predictionOptions: [
+      'Particles move from high to low concentration until both sides are equal',
+      'Particles move from low to high concentration',
+      'Particles stop moving completely',
+      'The membrane pushes particles to balance them'
+    ],
+    correctPrediction: 0,
+    explanation: 'Particles move randomly from areas of high concentration to low concentration until they are evenly distributed. This is called dynamic equilibrium — particles still move, but there is no net change.',
+  },
+  {
+    id: 'c2',
+    mode: 'osmosis',
+    goal: 'Make the cell swell with water',
+    setup: { concentration: 70, mode: 'osmosis' },
+    question: 'To make water move INTO the cell, the outside solution should be:',
+    predictionOptions: [
+      'Hypertonic (higher solute outside)',
+      'Hypotonic (lower solute outside)',
+      'Isotonic (equal solute)',
+      'Water cannot move through the membrane'
+    ],
+    correctPrediction: 1,
+    explanation: 'In a hypotonic solution, the outside has fewer solutes than inside the cell. Water moves by osmosis from high water potential (outside) to low water potential (inside), causing the cell to swell.',
+  },
+  {
+    id: 'c3',
+    mode: 'active-transport',
+    goal: 'Move solutes from LOW concentration to HIGH concentration',
+    setup: { concentration: 40, mode: 'active-transport' },
+    question: 'To move solutes AGAINST the concentration gradient, the cell must:',
+    predictionOptions: [
+      'Wait for diffusion to do the work',
+      'Use energy (ATP) and carrier proteins',
+      'Increase the temperature',
+      'Open larger channels in the membrane'
+    ],
+    correctPrediction: 1,
+    explanation: 'Active transport requires energy in the form of ATP. Carrier proteins change shape using ATP to pump solutes against their concentration gradient — from low to high concentration.',
+  },
+];
 
 export default function MembraneTransport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(0);
   const particlesRef = useRef<Particle[]>([]);
   const carriersRef = useRef<CarrierProtein[]>([]);
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [mode, setMode] = useState<SimMode>('diffusion');
   const [viewMode, setViewMode] = useState<ViewMode>('explore');
+  const [mode, setMode] = useState<SimMode>('diffusion');
   const [concentration, setConcentration] = useState(70);
   const [speed, setSpeed] = useState(1);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [particleData, setParticleData] = useState<ParticleData[]>([]);
-  const [showMisconception, setShowMisconception] = useState(false);
   const [atpCount, setAtpCount] = useState(0);
 
+  const [currentChallenge, setCurrentChallenge] = useState(0);
+  const [phase, setPhase] = useState<ChallengePhase>('goal');
+  const [selectedPrediction, setSelectedPrediction] = useState<number | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [observation, setObservation] = useState('');
+  const [challengeComplete, setChallengeComplete] = useState<Record<string, boolean>>({});
+  const [score, setScore] = useState(0);
+
+  const challenge = CHALLENGES[currentChallenge];
   const W = 600;
   const H = 400;
+
+  const isChallengeMode = viewMode === 'explore';
 
   const initSimulation = useCallback(() => {
     particlesRef.current = [];
     carriersRef.current = [];
     setElapsedTime(0);
-    setParticleData([]);
     setAtpCount(0);
 
-    if (mode === 'diffusion') {
-      const highCount = Math.floor(concentration * 1.8);
-      const lowCount = Math.floor((100 - concentration) * 0.6);
+    const activeMode = isChallengeMode ? challenge.setup.mode : mode;
+    const activeConc = isChallengeMode ? challenge.setup.concentration : concentration;
+
+    if (activeMode === 'diffusion') {
+      const highCount = Math.floor(activeConc * 1.8);
+      const lowCount = Math.floor((100 - activeConc) * 0.6);
       for (let i = 0; i < highCount; i++) {
         particlesRef.current.push({
           x: Math.random() * (W / 2 - 30) + 15,
@@ -84,8 +130,8 @@ export default function MembraneTransport() {
           carrierIdx: -1,
         });
       }
-    } else if (mode === 'osmosis') {
-      const soluteCount = Math.floor(concentration * 0.8);
+    } else if (activeMode === 'osmosis') {
+      const soluteCount = Math.floor(activeConc * 0.8);
       for (let i = 0; i < soluteCount; i++) {
         particlesRef.current.push({
           x: W / 2 + 25 + Math.random() * (W / 2 - 35),
@@ -115,9 +161,7 @@ export default function MembraneTransport() {
         });
       }
     } else {
-      // Active Transport: solutes start on LOW concentration side (left)
-      // They need to be pumped to HIGH concentration side (right) AGAINST gradient
-      const soluteCount = Math.floor(concentration * 0.5);
+      const soluteCount = Math.floor(activeConc * 0.5);
       for (let i = 0; i < soluteCount; i++) {
         particlesRef.current.push({
           x: Math.random() * (W / 2 - 40) + 15,
@@ -130,7 +174,6 @@ export default function MembraneTransport() {
           carrierIdx: -1,
         });
       }
-      // Some already on the right (high concentration) to show gradient
       for (let i = 0; i < Math.floor(soluteCount * 0.6); i++) {
         particlesRef.current.push({
           x: W / 2 + 30 + Math.random() * (W / 2 - 40),
@@ -143,7 +186,6 @@ export default function MembraneTransport() {
           carrierIdx: -1,
         });
       }
-      // Add floating ATP molecules on the left side
       for (let i = 0; i < 8; i++) {
         particlesRef.current.push({
           x: Math.random() * (W / 2 - 60) + 15,
@@ -156,7 +198,6 @@ export default function MembraneTransport() {
           carrierIdx: -1,
         });
       }
-      // Create carrier proteins at membrane channels
       const channelPositions = [50, 120, 190, 260, 330];
       for (const y of channelPositions) {
         carriersRef.current.push({
@@ -171,7 +212,21 @@ export default function MembraneTransport() {
       }
     }
     drawFrame();
-  }, [mode, concentration]);
+  }, [mode, concentration, isChallengeMode, challenge, W, H]);
+
+  const getCurrentCounts = useCallback(() => {
+    let left = 0, right = 0;
+    const target = isChallengeMode
+      ? (challenge.setup.mode === 'osmosis' ? 'water' : 'solute')
+      : (mode === 'osmosis' ? 'water' : 'solute');
+    particlesRef.current.forEach(p => {
+      if (p.type === target) {
+        if (p.x < W / 2) left++;
+        else right++;
+      }
+    });
+    return { left, right };
+  }, [isChallengeMode, challenge, mode, W]);
 
   const drawFrame = useCallback(() => {
     const canvas = canvasRef.current;
@@ -180,20 +235,18 @@ export default function MembraneTransport() {
     if (!ctx) return;
 
     ctx.clearRect(0, 0, W, H);
-    // Background
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, W, H);
 
-    // Side labels with subtle gradient backgrounds
-    if (mode === 'active-transport') {
-      // Left = LOW concentration (source)
+    const activeMode = isChallengeMode ? challenge.setup.mode : mode;
+
+    if (activeMode === 'active-transport') {
       const leftGrad = ctx.createLinearGradient(0, 0, W / 2 - 12, 0);
       leftGrad.addColorStop(0, 'rgba(59, 130, 246, 0.05)');
       leftGrad.addColorStop(1, 'rgba(59, 130, 246, 0.02)');
       ctx.fillStyle = leftGrad;
       ctx.fillRect(0, 0, W / 2 - 12, H);
 
-      // Right = HIGH concentration (destination)
       const rightGrad = ctx.createLinearGradient(W / 2 + 12, 0, W, 0);
       rightGrad.addColorStop(0, 'rgba(168, 85, 247, 0.02)');
       rightGrad.addColorStop(1, 'rgba(168, 85, 247, 0.05)');
@@ -201,41 +254,34 @@ export default function MembraneTransport() {
       ctx.fillRect(W / 2 + 12, 0, W / 2 - 12, H);
     }
 
-    // Membrane
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(W / 2 - 12, 0, 24, H);
 
-    if (mode === 'active-transport') {
-      // Draw carrier proteins as pump structures
-      carriersRef.current.forEach((carrier, idx) => {
+    if (activeMode === 'active-transport') {
+      carriersRef.current.forEach((carrier) => {
         const cx = W / 2;
         const cy = carrier.y;
         const isActive = carrier.state !== 'idle';
         const glowAlpha = isActive ? 0.4 + carrier.pumpPhase * 0.3 : 0.15;
 
-        // Pump body - outer shape
         ctx.save();
         ctx.translate(cx, cy);
 
-        // Glow effect for active carriers
         if (isActive || carrier.atpGlow > 0) {
           const glow = carrier.atpGlow > 0 ? carrier.atpGlow : glowAlpha;
           ctx.shadowColor = '#a855f7';
           ctx.shadowBlur = 15 * glow;
         }
 
-        // Pump body
         ctx.fillStyle = isActive
           ? `rgba(168, 85, 247, ${0.4 + carrier.pumpPhase * 0.3})`
           : 'rgba(168, 85, 247, 0.25)';
         ctx.strokeStyle = isActive ? '#c084fc' : '#7c3aed';
         ctx.lineWidth = 2;
 
-        // Draw channel shape based on state
         const openLeft = carrier.state === 'open-left' || carrier.state === 'grabbing' || carrier.state === 'idle';
         const openRight = carrier.state === 'open-right' || carrier.state === 'releasing';
 
-        // Left channel door
         ctx.beginPath();
         if (openLeft) {
           ctx.moveTo(-16, -14);
@@ -254,13 +300,11 @@ export default function MembraneTransport() {
         ctx.fill();
         ctx.stroke();
 
-        // Main pump body
         ctx.beginPath();
         ctx.roundRect(-14, -16, 28, 32, 4);
         ctx.fill();
         ctx.stroke();
 
-        // Right channel door
         ctx.beginPath();
         if (openRight) {
           ctx.moveTo(16, -14);
@@ -279,20 +323,17 @@ export default function MembraneTransport() {
         ctx.fill();
         ctx.stroke();
 
-        // "P" label for Pump
         ctx.fillStyle = isActive ? '#f0abfc' : '#a78bfa';
         ctx.font = 'bold 10px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('P', 0, 0);
 
-        // ATP consumption flash
         if (carrier.atpGlow > 0) {
           ctx.shadowColor = '#facc15';
           ctx.shadowBlur = 20 * carrier.atpGlow;
           ctx.fillStyle = `rgba(250, 204, 21, ${carrier.atpGlow * 0.8})`;
           ctx.beginPath();
-          // Draw ATP spark shape
           const sparkR = 8 + carrier.atpGlow * 6;
           for (let i = 0; i < 6; i++) {
             const angle = (i / 6) * Math.PI * 2;
@@ -304,15 +345,12 @@ export default function MembraneTransport() {
           }
           ctx.closePath();
           ctx.fill();
-
-          // "ATP" text
           ctx.fillStyle = `rgba(250, 204, 21, ${carrier.atpGlow})`;
           ctx.font = 'bold 8px monospace';
           ctx.fillText('ATP', 0, -20);
           ctx.shadowBlur = 0;
         }
 
-        // Directional arrow (showing against-gradient movement: left → right)
         if (carrier.state === 'transporting') {
           ctx.strokeStyle = `rgba(250, 204, 21, ${0.5 + carrier.pumpPhase * 0.5})`;
           ctx.lineWidth = 2;
@@ -329,13 +367,12 @@ export default function MembraneTransport() {
         ctx.shadowBlur = 0;
       });
     } else {
-      // Passive channel drawing for diffusion/osmosis
-      const channelColor = mode === 'osmosis' ? '#22d3ee' : '#38bdf8';
+      const channelColor = activeMode === 'osmosis' ? '#22d3ee' : '#38bdf8';
       for (let y = 30; y < H; y += 60) {
         ctx.fillStyle = channelColor;
         ctx.fillRect(W / 2 - 14, y, 28, 22);
         ctx.fillStyle = '#0f172a';
-        if (mode === 'osmosis') {
+        if (activeMode === 'osmosis') {
           ctx.fillRect(W / 2 - 5, y + 3, 10, 16);
         } else {
           ctx.fillRect(W / 2 - 8, y + 3, 16, 16);
@@ -343,14 +380,12 @@ export default function MembraneTransport() {
       }
     }
 
-    // Draw particles
     particlesRef.current.forEach(p => {
-      if (p.bound) return; // bound particles drawn at carrier position
+      if (p.bound) return;
 
       ctx.beginPath();
 
       if (p.type === 'atp') {
-        // ATP molecule - yellow diamond shape
         const sz = 5;
         ctx.moveTo(p.x, p.y - sz);
         ctx.lineTo(p.x + sz, p.y);
@@ -361,7 +396,6 @@ export default function MembraneTransport() {
         ctx.shadowColor = '#facc15';
         ctx.shadowBlur = 6;
         ctx.fill();
-        // Label
         ctx.fillStyle = 'rgba(250, 204, 21, 0.5)';
         ctx.font = '6px monospace';
         ctx.textAlign = 'center';
@@ -382,13 +416,11 @@ export default function MembraneTransport() {
       ctx.shadowBlur = 0;
     });
 
-    // Draw bound particles at carrier positions
     carriersRef.current.forEach(carrier => {
       if (carrier.boundParticleIdx >= 0 && carrier.boundParticleIdx < particlesRef.current.length) {
         const p = particlesRef.current[carrier.boundParticleIdx];
         if (p && p.bound) {
           ctx.beginPath();
-          // Position inside the carrier
           let drawX = W / 2;
           if (carrier.state === 'grabbing') {
             drawX = W / 2 - 8 + carrier.pumpPhase * 4;
@@ -407,74 +439,58 @@ export default function MembraneTransport() {
       }
     });
 
-    // Counts overlay
-    let leftSolute = 0, rightSolute = 0, leftWater = 0, rightWater = 0;
-    particlesRef.current.forEach(p => {
-      if (p.type === 'atp') return;
-      if (p.x < W / 2) {
-        if (p.type === 'solute') leftSolute++;
-        else if (p.type === 'water') leftWater++;
-      } else {
-        if (p.type === 'solute') rightSolute++;
-        else if (p.type === 'water') rightWater++;
-      }
-    });
+    const counts = getCurrentCounts();
 
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.font = '11px monospace';
     ctx.textAlign = 'left';
-    if (mode === 'diffusion') {
-      ctx.fillText(`Solute L:${leftSolute} | R:${rightSolute}`, 15, 22);
-    } else if (mode === 'osmosis') {
-      ctx.fillText(`Solute L:${leftSolute} R:${rightSolute}`, 15, 22);
-      ctx.fillText(`Water  L:${leftWater} R:${rightWater}`, 15, 38);
+    if (activeMode === 'diffusion') {
+      ctx.fillText(`Solute L:${counts.left} | R:${counts.right}`, 15, 22);
+    } else if (activeMode === 'osmosis') {
+      ctx.fillText(`Solute L:${counts.left} R:${counts.right}`, 15, 22);
+      ctx.fillText(`Water  L:${counts.left} R:${counts.right}`, 15, 38);
     } else {
-      ctx.fillText(`Solute L:${leftSolute} R:${rightSolute}`, 15, 22);
-      // ATP counter
+      ctx.fillText(`Solute L:${counts.left} R:${counts.right}`, 15, 22);
       const atpLeft = particlesRef.current.filter(p => p.type === 'atp' && !p.bound).length;
       ctx.fillStyle = 'rgba(250, 204, 21, 0.7)';
       ctx.fillText(`ATP Available: ${atpLeft}`, 15, 38);
     }
 
-    // Side labels
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.font = '16px sans-serif';
-    if (mode === 'diffusion') {
+    if (activeMode === 'diffusion') {
       ctx.fillText('High Conc.', 30, H - 15);
       ctx.textAlign = 'right';
       ctx.fillText('Low Conc.', W - 30, H - 15);
-    } else if (mode === 'osmosis') {
-      ctx.fillText('Hypotonic', 40, H - 15);
+    } else if (activeMode === 'osmosis') {
+      ctx.fillText('Inside Cell', 40, H - 15);
       ctx.textAlign = 'right';
-      ctx.fillText('Hypertonic', W - 30, H - 15);
+      ctx.fillText('Outside Cell', W - 30, H - 15);
     } else {
       ctx.fillText('Low Conc.', 40, H - 15);
       ctx.textAlign = 'right';
       ctx.fillText('High Conc.', W - 30, H - 15);
-      // Direction arrow at bottom
       ctx.fillStyle = 'rgba(168, 85, 247, 0.3)';
       ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('⟶ Against Gradient (requires ATP) ⟶', W / 2, H - 15);
     }
     ctx.textAlign = 'left';
-  }, [mode, W, H]);
+  }, [isChallengeMode, challenge, mode, W, H, getCurrentCounts]);
 
   const updatePhysics = useCallback(() => {
     const particles = particlesRef.current;
     const carriers = carriersRef.current;
+    const activeMode = isChallengeMode ? challenge.setup.mode : mode;
 
-    // Update carrier protein state machines (active transport only)
-    if (mode === 'active-transport') {
+    if (activeMode === 'active-transport') {
       carriers.forEach((carrier, cIdx) => {
-        // Decay ATP glow
         if (carrier.atpGlow > 0) {
           carrier.atpGlow = Math.max(0, carrier.atpGlow - 0.02);
         }
 
         switch (carrier.state) {
           case 'idle': {
-            // Look for nearby solute on the LEFT side
             let closest = -1;
             let closestDist = 60;
             particles.forEach((p, pIdx) => {
@@ -495,7 +511,6 @@ export default function MembraneTransport() {
             break;
           }
           case 'open-left': {
-            // Attract the target particle toward the carrier
             const p = particles[carrier.boundParticleIdx];
             if (p && !p.bound) {
               const dx = (W / 2 - 16) - p.x;
@@ -511,11 +526,9 @@ export default function MembraneTransport() {
                 carrier.timer = 0;
                 carrier.pumpPhase = 0;
 
-                // Find and consume an ATP molecule
                 const atpIdx = particles.findIndex(ap => ap.type === 'atp' && !ap.bound);
                 if (atpIdx >= 0) {
                   particles.splice(atpIdx, 1);
-                  // Fix indices after splice
                   carriers.forEach(c => {
                     if (c.boundParticleIdx > atpIdx) c.boundParticleIdx--;
                   });
@@ -546,7 +559,6 @@ export default function MembraneTransport() {
             break;
           }
           case 'transporting': {
-            // Conformational change - pump phase animates from 0 to 1
             carrier.pumpPhase = Math.min(1, carrier.pumpPhase + 0.02);
             carrier.conformationAngle = Math.sin(carrier.pumpPhase * Math.PI) * 15;
             carrier.timer++;
@@ -566,7 +578,6 @@ export default function MembraneTransport() {
             break;
           }
           case 'releasing': {
-            // Release the particle on the RIGHT side
             const p = particles[carrier.boundParticleIdx];
             if (p) {
               p.bound = false;
@@ -588,9 +599,8 @@ export default function MembraneTransport() {
       });
     }
 
-    // Update particle physics
     particles.forEach(p => {
-      if (p.bound) return; // bound particles are drawn at carrier position
+      if (p.bound) return;
 
       p.x += p.vx * speed;
       p.y += p.vy * speed;
@@ -602,11 +612,11 @@ export default function MembraneTransport() {
       p.y = Math.max(8, Math.min(H - 8, p.y));
 
       const inCenterZone = p.x > W / 2 - 18 && p.x < W / 2 + 18;
-      if (inCenterZone && mode !== 'active-transport') {
+      if (inCenterZone && activeMode !== 'active-transport') {
         let passed = false;
         for (let y = 30; y < H; y += 60) {
           if (p.y > y && p.y < y + 22) {
-            if (mode === 'osmosis' && p.type === 'solute') {
+            if (activeMode === 'osmosis' && p.type === 'solute') {
               passed = false;
             } else {
               passed = true;
@@ -624,9 +634,7 @@ export default function MembraneTransport() {
             p.vx = Math.abs(p.vx);
           }
         }
-      } else if (inCenterZone && mode === 'active-transport') {
-        // In active transport, the membrane blocks ALL passive movement
-        // Only carrier proteins can move solutes across
+      } else if (inCenterZone && activeMode === 'active-transport') {
         if (p.type !== 'atp') {
           if (p.x < W / 2) {
             p.x = W / 2 - 19;
@@ -638,17 +646,16 @@ export default function MembraneTransport() {
         }
       }
 
-      // Brownian motion
       p.vx += (Math.random() - 0.5) * 0.3;
       p.vy += (Math.random() - 0.5) * 0.3;
       p.vx = Math.max(-5, Math.min(5, p.vx));
       p.vy = Math.max(-5, Math.min(5, p.vy));
     });
-  }, [mode, speed, W]);
+  }, [isChallengeMode, challenge, mode, speed, W, H]);
 
   useEffect(() => {
     initSimulation();
-  }, [mode, concentration]);
+  }, [mode, concentration, currentChallenge]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -672,23 +679,53 @@ export default function MembraneTransport() {
     initSimulation();
   };
 
-  const getCurrentCounts = () => {
-    let left = 0, right = 0;
-    const target = mode === 'osmosis' ? 'water' : 'solute';
-    particlesRef.current.forEach(p => {
-      if (p.type === target) {
-        if (p.x < W / 2) left++;
-        else right++;
-      }
-    });
-    return { left, right };
-  };
-
   const counts = getCurrentCounts();
   const isEquilibrium = Math.abs(counts.left - counts.right) <= 5;
 
+  const checkGoalAchieved = () => {
+    const activeMode = isChallengeMode ? challenge.setup.mode : mode;
+    if (activeMode === 'diffusion') return isEquilibrium;
+    if (activeMode === 'osmosis') return counts.left > counts.right;
+    if (activeMode === 'active-transport') return counts.right > counts.left * 1.5;
+    return false;
+  };
+
+  const handlePredictionSelect = (idx: number) => {
+    setSelectedPrediction(idx);
+    const isCorrect = idx === challenge.correctPrediction;
+    if (isCorrect) setScore(s => s + 3);
+  };
+
+  const moveToObserve = () => {
+    setPhase('observe');
+    setIsPlaying(true);
+  };
+
+  const handleReflect = () => {
+    const goalAchieved = checkGoalAchieved();
+    if (goalAchieved) {
+      setChallengeComplete(prev => ({ ...prev, [challenge.id]: true }));
+      setScore(s => s + 5);
+    }
+    setPhase('reflect');
+    setShowResult(true);
+  };
+
+  const nextChallenge = () => {
+    const next = (currentChallenge + 1) % CHALLENGES.length;
+    setCurrentChallenge(next);
+    setPhase('goal');
+    setSelectedPrediction(null);
+    setShowResult(false);
+    setObservation('');
+    setIsPlaying(false);
+    initSimulation();
+  };
+
+  const completedCount = Object.keys(challengeComplete).length;
+
   return (
-    <div className="flex flex-col items-center justify-center w-full h-[600px] bg-black p-6 rounded-3xl border border-brand-border/30 shadow-2xl relative">
+    <div className="flex flex-col items-center justify-center w-full min-h-[600px] bg-black p-6 rounded-3xl border border-brand-border/30 shadow-2xl relative">
       <div className="absolute top-4 left-4 flex gap-2 z-20">
         <button
           onClick={() => setViewMode('explore')}
@@ -697,7 +734,7 @@ export default function MembraneTransport() {
           }`}
         >
           <Eye size={14} />
-          Explore
+          Challenge
         </button>
         <button
           onClick={() => setViewMode('learn')}
@@ -706,41 +743,148 @@ export default function MembraneTransport() {
           }`}
         >
           <GraduationCap size={14} />
-          Learn
+          Free Play
         </button>
       </div>
 
-      <div className="flex bg-slate-900 border border-brand-border rounded-xl p-1 mb-4 mt-12">
-        <button
-          onClick={() => { setMode('diffusion'); setIsPlaying(false); }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
-            mode === 'diffusion' ? 'bg-brand-accent text-black shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Diffusion
-        </button>
-        <button
-          onClick={() => { setMode('osmosis'); setIsPlaying(false); }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
-            mode === 'osmosis' ? 'bg-brand-accent text-black shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Osmosis
-        </button>
-        <button
-          onClick={() => { setMode('active-transport'); setIsPlaying(false); }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
-            mode === 'active-transport' ? 'bg-purple-400 text-black shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Active Transport
-        </button>
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
+        <div className="px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full">
+          <span className="text-yellow-400 font-mono text-xs font-bold">{score} pts</span>
+        </div>
+        <div className="px-3 py-1 bg-brand-accent/10 border border-brand-accent/20 rounded-full">
+          <span className="text-brand-accent font-mono text-xs font-bold">{completedCount}/{CHALLENGES.length} done</span>
+        </div>
       </div>
 
-      <div className="relative rounded-2xl overflow-hidden border-2 border-slate-700/50 shadow-[0_0_40px_rgba(0,0,0,0.8)]">
+      {viewMode === 'explore' && (
+        <>
+          {phase === 'goal' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-lg mt-16 mb-4 bg-slate-900/80 border border-brand-accent/30 rounded-2xl p-6 text-center"
+            >
+              <div className="text-brand-accent text-3xl mb-3">🎯</div>
+              <h3 className="text-lg font-bold text-white mb-2">Challenge {currentChallenge + 1}: {challenge.mode === 'diffusion' ? 'Diffusion' : challenge.mode === 'osmosis' ? 'Osmosis' : 'Active Transport'}</h3>
+              <p className="text-slate-300 text-sm mb-4"><strong className="text-brand-accent">Goal:</strong> {challenge.goal}</p>
+              <button
+                onClick={() => setPhase('predict')}
+                className="px-6 py-3 bg-brand-accent text-black rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-white transition-all"
+              >
+                Start Challenge →
+              </button>
+            </motion.div>
+          )}
+
+          {phase === 'predict' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-lg mt-16 mb-4 bg-slate-900/80 border border-yellow-500/20 rounded-2xl p-6"
+            >
+              <h3 className="text-sm font-bold text-yellow-400 uppercase tracking-widest mb-3">🤔 Make Your Prediction</h3>
+              <p className="text-white text-sm mb-4">{challenge.question}</p>
+              <div className="space-y-2 mb-4">
+                {challenge.predictionOptions.map((opt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handlePredictionSelect(idx)}
+                    className={`w-full text-left p-3 rounded-xl text-sm transition-all border ${
+                      selectedPrediction === idx
+                        ? idx === challenge.correctPrediction
+                          ? 'bg-green-500/20 border-green-500 text-green-400'
+                          : 'bg-red-500/20 border-red-500 text-red-400'
+                        : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-yellow-500/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{opt}</span>
+                      {selectedPrediction === idx && (
+                        idx === challenge.correctPrediction
+                          ? <CheckCircle2 size={16} className="text-green-400" />
+                          : <XCircle size={16} className="text-red-400" />
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {selectedPrediction !== null && (
+                <button
+                  onClick={moveToObserve}
+                  className="w-full px-6 py-3 bg-yellow-500 text-black rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-yellow-400 transition-all flex items-center justify-center gap-2"
+                >
+                  Run the Simulation <ArrowRight size={16} />
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {phase === 'observe' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-lg mt-16 mb-4 bg-slate-900/80 border border-cyan-500/20 rounded-2xl p-6"
+            >
+              <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-widest mb-3">🔬 Observe the Results</h3>
+              <p className="text-slate-300 text-sm mb-3">Watch the simulation. Did your prediction match what happened?</p>
+              <div className="bg-black/40 rounded-xl p-3 border border-slate-800 mb-4">
+                <div className="text-xs text-slate-500 mb-1">Left Side</div>
+                <div className="text-lg font-mono text-white">{counts.left} particles</div>
+                <div className="text-xs text-slate-500 mt-2 mb-1">Right Side</div>
+                <div className="text-lg font-mono text-white">{counts.right} particles</div>
+                <div className="text-xs text-slate-500 mt-2">
+                  Status: {isEquilibrium ? <span className="text-green-400">Equilibrium</span> : <span className="text-yellow-400">Not at equilibrium</span>}
+                </div>
+              </div>
+              <textarea
+                value={observation}
+                onChange={e => setObservation(e.target.value)}
+                placeholder="What did you observe? Did it match your prediction?"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm resize-none h-20 focus:border-cyan-400 outline-none mb-3"
+              />
+              <button
+                onClick={handleReflect}
+                disabled={!observation.trim()}
+                className="w-full px-6 py-3 bg-green-500 text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-green-400 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+              >
+                Submit Observation <CheckCircle2 size={16} />
+              </button>
+            </motion.div>
+          )}
+
+          {phase === 'reflect' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-lg mt-16 mb-4 bg-slate-900/80 border border-green-500/20 rounded-2xl p-6"
+            >
+              <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-3">💡 What We Learned</h3>
+              <div className={`p-4 rounded-xl border mb-4 ${checkGoalAchieved() ? 'bg-green-500/10 border-green-500/30 text-green-300' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'}`}>
+                <p className="text-sm leading-relaxed">{challenge.explanation}</p>
+              </div>
+              <div className="bg-black/40 rounded-xl p-4 border border-slate-800 mb-4">
+                <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Your Prediction</div>
+                <div className={`text-sm ${selectedPrediction === challenge.correctPrediction ? 'text-green-400' : 'text-red-400'}`}>
+                  {selectedPrediction !== null ? challenge.predictionOptions[selectedPrediction] : 'No prediction made'}
+                </div>
+                <div className="text-xs text-slate-500 uppercase tracking-widest mt-2 mb-1">What Actually Happened</div>
+                <div className="text-sm text-cyan-400">{challenge.predictionOptions[challenge.correctPrediction]}</div>
+              </div>
+              <button
+                onClick={nextChallenge}
+                className="w-full px-6 py-3 bg-brand-accent text-black rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-white transition-all flex items-center justify-center gap-2"
+              >
+                {currentChallenge < CHALLENGES.length - 1 ? 'Next Challenge →' : 'Restart Challenges ↻'} <ArrowRight size={16} />
+              </button>
+            </motion.div>
+          )}
+        </>
+      )}
+
+      <div className={`relative rounded-2xl overflow-hidden border-2 border-slate-700/50 shadow-[0_0_40px_rgba(0,0,0,0.8)] ${viewMode === 'explore' ? 'mt-4' : 'mt-12'}`}>
         <canvas ref={canvasRef} width={W} height={H} className="block" />
 
-        {isEquilibrium && isPlaying && mode === 'diffusion' && (
+        {isEquilibrium && isPlaying && !isChallengeMode && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -749,143 +893,147 @@ export default function MembraneTransport() {
             Equilibrium Reached!
           </motion.div>
         )}
-
-        {mode === 'active-transport' && isPlaying && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="absolute top-4 right-4 flex flex-col items-end gap-1"
-          >
-            <div className="px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-lg text-purple-300 text-[10px] font-bold uppercase tracking-widest">
-              ATP Used: {atpCount}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm bg-purple-500/50 border border-purple-400" />
-              <span className="text-[10px] text-purple-300">Carrier Protein</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rotate-45 bg-yellow-500/50 border border-yellow-400" />
-              <span className="text-[10px] text-yellow-300">ATP Molecule</span>
-            </div>
-          </motion.div>
-        )}
       </div>
 
-      <div className="w-full max-w-[600px] mt-4">
-        <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-          <span>Left: {counts.left} {mode === 'osmosis' ? 'water' : 'solute'}</span>
-          <span className={`font-bold ${
-            mode === 'active-transport'
-              ? counts.right > counts.left ? 'text-purple-400' : 'text-slate-400'
-              : isEquilibrium ? 'text-green-400' : 'text-slate-400'
-          }`}>
-            {mode === 'active-transport'
-              ? counts.right > counts.left ? 'PUMPING AGAINST GRADIENT' : 'PUMPING...'
-              : isEquilibrium ? 'EQUILIBRIUM' : 'NOT EQUILIBRIUM'}
-          </span>
-          <span>Right: {counts.right} {mode === 'osmosis' ? 'water' : 'solute'}</span>
-        </div>
-        <div className="flex gap-2 mt-2 h-4">
-          <div className="flex-1 bg-slate-800 rounded-full overflow-hidden flex">
-            <div
-              className={`h-full transition-all duration-300 ${mode === 'active-transport' ? 'bg-purple-500/60' : 'bg-red-500/60'}`}
-              style={{ width: `${(counts.left / (counts.left + counts.right || 1)) * 100}%` }}
-            />
-            <div
-              className="h-full bg-cyan-500/60 transition-all duration-300"
-              style={{ width: `${(counts.right / (counts.left + counts.right || 1)) * 100}%` }}
-            />
+      {viewMode === 'learn' && (
+        <>
+          <div className="w-full max-w-[600px] mt-4">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+              <span>Left: {counts.left}</span>
+              <span className={isEquilibrium ? 'text-green-400 font-bold' : 'text-slate-400'}>
+                {isEquilibrium ? 'EQUILIBRIUM' : 'NOT EQUILIBRIUM'}
+              </span>
+              <span>Right: {counts.right}</span>
+            </div>
+            <div className="flex gap-2 mt-2 h-4">
+              <div className="flex-1 bg-slate-800 rounded-full overflow-hidden flex">
+                <div
+                  className="h-full bg-red-500/60 transition-all duration-300"
+                  style={{ width: `${(counts.left / (counts.left + counts.right || 1)) * 100}%` }}
+                />
+                <div
+                  className="h-full bg-cyan-500/60 transition-all duration-300"
+                  style={{ width: `${(counts.right / (counts.left + counts.right || 1)) * 100}%` }}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-4 mt-4 w-full max-w-[600px]">
-        <div className="flex gap-3">
-          <button
-            onClick={togglePlay}
-            className={`flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-widest rounded-xl transition-all text-sm ${
-              isPlaying
-                ? 'bg-red-500/20 border border-red-500 text-red-400'
-                : 'bg-brand-accent text-black hover:bg-white shadow-[0_0_20px_rgba(34,211,238,0.3)]'
-            }`}
-          >
-            {isPlaying ? <><span className="w-4 h-4 bg-red-500 rounded-sm"></span> Pause</> : <><Play fill="currentColor" size={18} /> Play</>}
+          <div className="flex flex-wrap items-center gap-4 mt-4 w-full max-w-[600px]">
+            <div className="flex gap-3">
+              <button
+                onClick={togglePlay}
+                className={`flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-widest rounded-xl transition-all text-sm ${
+                  isPlaying
+                    ? 'bg-red-500/20 border border-red-500 text-red-400'
+                    : 'bg-brand-accent text-black hover:bg-white shadow-[0_0_20px_rgba(34,211,238,0.3)]'
+                }`}
+              >
+                {isPlaying ? <><span className="w-4 h-4 bg-red-500 rounded-sm"></span> Pause</> : <><Play fill="currentColor" size={18} /> Play</>}
+              </button>
+              <button
+                onClick={handleReset}
+                className="flex items-center justify-center p-3 bg-slate-800 text-slate-300 rounded-xl border border-slate-600 hover:text-white transition-colors"
+              >
+                <RotateCcw size={18} />
+              </button>
+            </div>
+
+            <div className="flex bg-slate-900 border border-brand-border rounded-xl p-1">
+              <button
+                onClick={() => { setMode('diffusion'); setIsPlaying(false); }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                  mode === 'diffusion' ? 'bg-brand-accent text-black' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Diffusion
+              </button>
+              <button
+                onClick={() => { setMode('osmosis'); setIsPlaying(false); }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                  mode === 'osmosis' ? 'bg-brand-accent text-black' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Osmosis
+              </button>
+              <button
+                onClick={() => { setMode('active-transport'); setIsPlaying(false); }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                  mode === 'active-transport' ? 'bg-purple-400 text-black shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Active Transport
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 flex-1">
+              <div className="flex-1">
+                <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">
+                  <span>Concentration</span>
+                  <span className="text-brand-accent">{concentration}%</span>
+                </div>
+                <input
+                  type="range" min="10" max="90" value={concentration}
+                  onChange={(e) => { setConcentration(Number(e.target.value)); setIsPlaying(false); }}
+                  className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-accent"
+                />
+              </div>
+              <div className="w-24">
+                <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">
+                  <span>Speed</span>
+                  <span className="text-brand-accent">{speed}x</span>
+                </div>
+                <input
+                  type="range" min="0.5" max="3" step="0.5" value={speed}
+                  onChange={(e) => setSpeed(Number(e.target.value))}
+                  className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-accent"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 text-center max-w-lg">
+            <p className="text-slate-400 text-sm">
+              {mode === 'diffusion'
+                ? 'Particles move randomly from high to low concentration until equilibrium.'
+                : mode === 'osmosis'
+                  ? 'Water moves across the membrane toward the higher solute concentration.'
+                  : 'Carrier proteins use ATP to pump solutes against the concentration gradient.'}
+            </p>
+          </div>
+        </>
+      )}
+
+      {viewMode === 'explore' && (
+        <div className="flex flex-wrap items-center gap-4 mt-4 w-full max-w-[600px]">
+          <button onClick={togglePlay} className={`flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-widest rounded-xl transition-all text-sm ${
+            isPlaying ? 'bg-red-500/20 border border-red-500 text-red-400' : 'bg-brand-accent text-black hover:bg-white'
+          }`}>
+            {isPlaying ? 'Pause' : 'Play'}
           </button>
-          <button
-            onClick={handleReset}
-            className="flex items-center justify-center p-3 bg-slate-800 text-slate-300 rounded-xl border border-slate-600 hover:text-white transition-colors"
-          >
+          <button onClick={handleReset} className="p-3 bg-slate-800 text-slate-300 rounded-xl hover:text-white">
             <RotateCcw size={18} />
           </button>
         </div>
-
-        <div className="flex items-center gap-4 flex-1">
-          <div className="flex-1">
-            <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">
-              <span>Concentration</span>
-              <span className="text-brand-accent">{concentration}%</span>
-            </div>
-            <input
-              type="range" min="10" max="90" value={concentration}
-              onChange={(e) => { setConcentration(Number(e.target.value)); setIsPlaying(false); }}
-              className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-accent"
-            />
-          </div>
-          <div className="w-24">
-            <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">
-              <span>Speed</span>
-              <span className="text-brand-accent">{speed}x</span>
-            </div>
-            <input
-              type="range" min="0.5" max="3" step="0.5" value={speed}
-              onChange={(e) => setSpeed(Number(e.target.value))}
-              className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-accent"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 text-center max-w-lg">
-        <p className="text-slate-400 text-sm">
-          {mode === 'diffusion'
-            ? 'Particles move randomly (Brownian motion) from high to low concentration until equilibrium.'
-            : mode === 'osmosis'
-              ? 'The semi-permeable membrane only allows water (cyan) to pass. Solutes (red) are trapped, causing water to shift toward higher solute concentration.'
-              : 'Carrier proteins (purple pumps) actively grab solutes from the LOW concentration side and pump them to the HIGH concentration side — against the gradient. Each transport event consumes one ATP molecule (yellow).'}
-        </p>
-
-        {viewMode === 'learn' && (
-          <button
-            onClick={() => setShowMisconception(!showMisconception)}
-            className="mt-3 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-400 text-xs font-bold uppercase tracking-widest hover:bg-yellow-500/20 transition-all"
-          >
-            Common Misconceptions About Osmosis
-          </button>
-        )}
-      </div>
-
-      {showMisconception && viewMode === 'learn' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-lg mt-4 space-y-4"
-        >
-          {CELL_MISCONCEPTIONS
-            .filter(m => m.id.includes('osmosis') || m.id.includes('diffusion') || m.id.includes('hypotonic'))
-            .map(m => (
-              <div key={m.id} className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-                <div className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">
-                  Misconception
-                </div>
-                <p className="text-slate-300 text-sm italic mb-2">"{m.misconception}"</p>
-                <div className="text-[10px] font-bold text-green-400 uppercase tracking-widest mb-1">
-                  Correct
-                </div>
-                <p className="text-white text-sm font-medium">{m.correction}</p>
-              </div>
-            ))}
-        </motion.div>
       )}
     </div>
   );
+}
+
+interface Particle {
+  x: number; y: number; vx: number; vy: number;
+  type: 'solute' | 'water' | 'atp';
+  side: 'left' | 'right';
+  bound: boolean;
+  carrierIdx: number;
+}
+
+interface CarrierProtein {
+  y: number;
+  state: 'idle' | 'open-left' | 'grabbing' | 'transporting' | 'open-right' | 'releasing';
+  timer: number;
+  boundParticleIdx: number;
+  atpGlow: number;
+  pumpPhase: number;
+  conformationAngle: number;
 }

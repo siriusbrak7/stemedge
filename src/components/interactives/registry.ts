@@ -4,7 +4,6 @@ import React, { type ComponentType, type LazyExoticComponent } from 'react';
 const AnimalPlantCell = React.lazy(() => import('./biology/AnimalPlantCell'));
 const MembraneTransport = React.lazy(() => import('./biology/MembraneTransport'));
 const LevelsOfOrg = React.lazy(() => import('./biology/LevelsOfOrg'));
-const CentralDogma = React.lazy(() => import('./biology/CentralDogma'));
 const SynapticSpark = React.lazy(() => import('./biology/SynapticSpark'));
 const MendelianInheritance = React.lazy(() => import('./biology/MendelianInheritance'));
 const DNAReplication = React.lazy(() => import('./biology/DNAReplication'));
@@ -19,7 +18,6 @@ const ImmuneResponse = React.lazy(() => import('./biology/ImmuneResponse'));
 const NutritionDigestion = React.lazy(() => import('./biology/NutritionDigestion'));
 const TransportSystems = React.lazy(() => import('./biology/TransportSystems'));
 const EcologyEcosystems = React.lazy(() => import('./biology/EcologyEcosystems'));
-const BiochemistryStudio = React.lazy(() => import('./biology/BiochemistryStudio'));
 
 // Physics
 const TypesOfForces = React.lazy(() => import('./physics/TypesOfForces'));
@@ -55,7 +53,6 @@ const SeparationTechniques = React.lazy(() => import('./chemistry/SeparationTech
 const OrganicChemStudio = React.lazy(() => import('./chemistry/OrganicChemStudio'));
 const EquilibriumSandbox = React.lazy(() => import('./chemistry/EquilibriumSandbox'));
 const RedoxHalfEquationBuilder = React.lazy(() => import('./chemistry/RedoxHalfEquationBuilder'));
-const MolecularGeometryVSEPR = React.lazy(() => import('./chemistry/MolecularGeometryVSEPR'));
 
 // Mathematics
 const VarsExpressions = React.lazy(() => import('./math/VarsExpressions'));
@@ -63,17 +60,12 @@ const SolveLinear = React.lazy(() => import('./math/SolveLinear'));
 const GraphLinear = React.lazy(() => import('./math/GraphLinear'));
 const QuadraticExplorer = React.lazy(() => import('./math/QuadraticExplorer'));
 const GeometryTrigonometry = React.lazy(() => import('./math/GeometryTrigonometry'));
-const AlgebraicSystems = React.lazy(() => import('./math/AlgebraicSystems'));
-const DataHandling = React.lazy(() => import('./math/DataHandling'));
 const DerivativeExplorer = React.lazy(() => import('./mathematics/DerivativeExplorer'));
 const IntegralAccumulator = React.lazy(() => import('./mathematics/IntegralAccumulator'));
 const OptimizationSandbox = React.lazy(() => import('./mathematics/OptimizationSandbox'));
 const CompletingSquare = React.lazy(() => import('./mathematics/CompletingSquare'));
 const ProjectileMotionMath = React.lazy(() => import('./mathematics/ProjectileMotionMath'));
 const QuadraticFormula = React.lazy(() => import('./mathematics/QuadraticFormula'));
-const ProbabilityStatsStudio = React.lazy(() => import('./mathematics/ProbabilityStatsStudio'));
-const FunctionTransformationComposer = React.lazy(() => import('./mathematics/FunctionTransformationComposer'));
-const ProbabilityDistributionLab = React.lazy(() => import('./mathematics/ProbabilityDistributionLab'));
 
 const HomeostasisControlLoop = React.lazy(() => import('./biology/HomeostasisControlLoop'));
 const PopulationGeneticsSimulator = React.lazy(() => import('./biology/PopulationGeneticsSimulator'));
@@ -85,7 +77,6 @@ export const interactiveRegistry: Record<string, LazyExoticComponent<ComponentTy
   'animal-vs-plant': AnimalPlantCell,
   'membrane-transport': MembraneTransport,
   'levels-organization': LevelsOfOrg,
-  'central-dogma': CentralDogma,
   neurotransmission: SynapticSpark,
   'mendelian-inheritance': MendelianInheritance,
   'dna-replication': DNAReplication,
@@ -100,7 +91,6 @@ export const interactiveRegistry: Record<string, LazyExoticComponent<ComponentTy
   'nutrition-digestion': NutritionDigestion,
   'transport-systems': TransportSystems,
   'ecology-ecosystems': EcologyEcosystems,
-  'biochemistry-studio': BiochemistryStudio,
 
   'types-forces': TypesOfForces,
   'newton-laws': NewtonLaws,
@@ -134,27 +124,19 @@ export const interactiveRegistry: Record<string, LazyExoticComponent<ComponentTy
   'organic-chemistry-studio': OrganicChemStudio,
   'equilibrium-sandbox': EquilibriumSandbox,
   'redox-half-equation-builder': RedoxHalfEquationBuilder,
-  'molecular-geometry-vsepr': MolecularGeometryVSEPR,
 
   'vars-expressions': VarsExpressions,
   'solve-linear': SolveLinear,
   'graph-linear': GraphLinear,
   'quadratic-explorer': QuadraticExplorer,
   'geometry-trigonometry': GeometryTrigonometry,
-  'algebraic-systems': AlgebraicSystems,
-  'data-handling': DataHandling,
   'derivative-explorer': DerivativeExplorer,
   'integral-accumulator': IntegralAccumulator,
   'optimization-sandbox': OptimizationSandbox,
   'completing-square': CompletingSquare,
   'projectile-math': ProjectileMotionMath,
   'quadratic-formula': QuadraticFormula,
-  'probability-statistics-studio': ProbabilityStatsStudio,
-  'function-transformation-composer': FunctionTransformationComposer,
-  'probability-distribution-lab': ProbabilityDistributionLab,
   'homeostasis-control-loop': HomeostasisControlLoop,
   'population-genetics-simulator': PopulationGeneticsSimulator,
   'respiration-energy-map': RespirationEnergyMap,
-
-
 };

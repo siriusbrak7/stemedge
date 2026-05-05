@@ -10,6 +10,8 @@ interface InteractiveEngineProps {
 export default function InteractiveEngine({ subtopicId }: InteractiveEngineProps) {
   const ActiveInteractive = interactiveRegistry[subtopicId];
 
+  if (!ActiveInteractive) return null;
+
   return (
     <div className="w-full mb-8">
       <AnimatePresence mode="wait">
@@ -33,17 +35,17 @@ export default function InteractiveEngine({ subtopicId }: InteractiveEngineProps
             <div className="relative z-10 w-full h-full flex items-center justify-center min-h-[500px]">
               {ActiveInteractive ? (
                 <ActiveInteractive />
-              ) : (
-                <div className="flex items-center justify-center h-64 bg-slate-900 border border-brand-border rounded-xl px-6">
-                  <p className="text-slate-400 font-mono text-sm">Interactive module not found for ID: {subtopicId}</p>
-                </div>
-              )}
+              ) : null}
             </div>
           </Suspense>
 
-          {/* Glowing Accents */}
-          <div className="absolute top-0 left-1/4 w-1/2 h-px bg-gradient-to-r from-transparent via-brand-accent/50 to-transparent" />
-          <div className="absolute bottom-0 left-1/4 w-1/2 h-px bg-gradient-to-r from-transparent via-brand-accent/50 to-transparent" />
+          {ActiveInteractive && (
+            <>
+              {/* Glowing Accents */}
+              <div className="absolute top-0 left-1/4 w-1/2 h-px bg-gradient-to-r from-transparent via-brand-accent/50 to-transparent" />
+              <div className="absolute bottom-0 left-1/4 w-1/2 h-px bg-gradient-to-r from-transparent via-brand-accent/50 to-transparent" />
+            </>
+          )}
         </motion.div>
       </AnimatePresence>
     </div>

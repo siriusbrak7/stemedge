@@ -4,12 +4,27 @@ import userEvent from '@testing-library/user-event';
 import VirtualLabEngine from '../../components/labs/VirtualLabEngine';
 import type { LabConfig } from '../../data/labs/labTypes';
 
-vi.mock('motion/react', () => ({
-  motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  },
-  AnimatePresence: ({ children }: any) => <>{children}</>,
-}));
+vi.mock('motion/react', () => {
+  const React = require('react');
+  return {
+    motion: new Proxy({}, {
+      get: (_target, key) => {
+        return ({ children, ...props }: any) => {
+          // Remove motion-specific props that would be invalid on native elements
+          const { 
+            whileHover, whileTap, initial, animate, exit, transition, 
+            layout, viewport, onAnimationStart, onAnimationComplete,
+            onUpdate, onDragStart, onDrag, onDragEnd, onMeasureDragConstraints,
+            variants, custom, inherit, style, ...validProps 
+          } = props;
+          
+          return React.createElement(key as string, validProps, children);
+        };
+      }
+    }),
+    AnimatePresence: ({ children }: any) => <>{children}</>,
+  };
+});
 
 const TEST_CONFIG: LabConfig = {
   id: 'test-lab',
@@ -144,19 +159,19 @@ describe('VirtualLabEngine', () => {
     render(<VirtualLabEngine config={TEST_CONFIG} renderSimulation={renderSim} onComplete={onComplete} />);
 
     // Phase: Predict - select an option
-    await user.click(screen.getByText('Period increases'));
+    await user.click(await screen.findByText('Period increases'));
 
     // Click "Start Observation" to advance to observe phase
-    await user.click(screen.getByText('Start Observation'));
+    await user.click(await screen.findByText('Start Observation'));
 
     // Phase: Observe - we need to record 3 data points
-    const recordBtns = screen.getAllByTestId('record-btn');
     for (let i = 0; i < 3; i++) {
-      await user.click(recordBtns[0]);
+      const recordBtn = await screen.findByTestId('record-btn');
+      await user.click(recordBtn);
     }
 
     // Click "Proceed to Analysis"
-    await user.click(screen.getByText('Proceed to Analysis'));
+    await user.click(await screen.findByText('Proceed to Analysis'));
 
     // Phase: Analyze - type answer
     const textareas = screen.getAllByRole('textbox');
