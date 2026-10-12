@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-canvas: #0B0D12;
+  --color-canvas-elevated: #0E1017;
+  --color-surface: #141722;
+  --color-inset: #0F121A;
+  --color-chip: #151923;
+  --color-muted: #12141C;
+  --color-border-subtle: #232938;
+  --color-border-faint: #1F2432;
+  --color-accent-amber: #F59E0B;
+  --color-accent-soft: rgba(245, 158, 11, 0.1);
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-canvas);
+    color: #e2e8f0;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+@keyframes loadNudge {
+  0% {
+    transform: translateX(0px);
+  }
+  15% {
+    transform: translateX(0px);
+  }
+  55% {
+    transform: translateX(13px);
+  }
+  75% {
+    transform: translateX(14px);
+  }
+  100% {
+    transform: translateX(0px);
+  }
+}
+
+.animate-load-nudge {
+  animation: loadNudge 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}

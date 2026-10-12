@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-canvas: #0b0d12;
+  --color-canvas-elevated: #0e1017;
+  --color-surface: #141722;
+  --color-inset: #0f121a;
+  --color-chip: #151923;
+  --color-muted-bg: #12141c;
+  --color-border-subtle: #232938;
+  --color-border-faint: #1f2432;
+  --color-accent: #f59e0b;
+  --color-accent-fg: #0b0d12;
+  --color-ink: #e2e8f0;
+  --color-ink-muted: #94a3b8;
+  --color-ink-faint: #64748b;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+@keyframes current-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.animate-current-dash {
+  animation: current-dash 0.7s linear infinite;
+}
+
+@keyframes pulse-slot {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-slot-pulse {
+  animation: pulse-slot 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-current-dash,
+  .animate-slot-pulse {
+    animation: none;
+  }
+}

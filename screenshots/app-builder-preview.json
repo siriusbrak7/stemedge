@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "STEMEdge",
+      "hasCanvas": false,
+      "bodyTextLen": 1528,
+      "bodyTextHash": "e5220c8abac23b4e93552d67ba0e39d09b57f24551f53794f9b19808d28cb863",
+      "bodyTextPrefix": "S STEMEdge CAMBRIDGE IGCSE Physics 0625 Interactive Laboratory S",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "STEMEdge",
+      "hasCanvas": false,
+      "bodyTextLen": 1480,
+      "bodyTextHash": "9e7d4c66c715c60134b2db497f5a5709b9f46d2708bddc541bc61d39523c5385",
+      "bodyTextPrefix": "S STEMEdge CAMBRIDGE IGCSE Directory Select simulation CAMBRIDGE",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: "Plus Jakarta Sans";
+        src: url("fonts/PlusJakartaSans-ExtraBold.ttf") format("truetype");
+        font-weight: 800;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        src: url("fonts/JetBrainsMono-Medium.ttf") format("truetype");
+        font-weight: 500;
+        font-style: normal;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #0b0d12;
+      }
+      .card {
+        width: 1200px;
+        height: 630px;
+        position: relative;
+        background: #0b0d12 url("og-bg.jpg") center / cover no-repeat;
+      }
+      .veil {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 58% 52% at 50% 47%,
+          rgba(11, 13, 18, 0.78) 0%,
+          rgba(11, 13, 18, 0.42) 46%,
+          rgba(11, 13, 18, 0.12) 72%,
+          transparent 100%
+        );
+      }
+      .lockup {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 96px 200px 108px;
+      }
+      .wordmark {
+        font-family: "Plus Jakarta Sans", sans-serif;
+        font-weight: 800;
+        font-size: 118px;
+        letter-spacing: -0.038em;
+        color: #f59e0b;
+        line-height: 0.92;
+        text-shadow:
+          0 0 34px rgba(245, 158, 11, 0.38),
+          0 2px 28px rgba(11, 13, 18, 0.85);
+      }
+      .rule {
+        width: 64px;
+        height: 2px;
+        background: #f59e0b;
+        opacity: 0.9;
+        border-radius: 1px;
+        box-shadow: 0 0 14px rgba(245, 158, 11, 0.6);
+      }
+      .tag {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 500;
+        font-size: 22px;
+        letter-spacing: 0.12em;
+        color: #e2e8f0;
+        text-shadow: 0 2px 16px rgba(11, 13, 18, 0.9);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="veil"></div>
+      <div class="lockup">
+        <div class="wordmark">STEMEdge</div>
+        <div class="rule"></div>
+        <div class="tag">Cambridge IGCSE Physics 0625</div>
+      </div>
+    </div>
+  </body>
+</html>
