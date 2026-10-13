@@ -168,9 +168,15 @@ export function stepMotion(
   velocity: number,
   acceleration: number,
   dt: number,
+  frictionN = 0,
+  appliedN = 0,
 ): { position: number; velocity: number; hitEnd: "min" | "max" | null } {
   let v = velocity + acceleration * dt;
   let s = position + v * dt;
+  if (frictionN > 0 && appliedN * velocity >= 0 && velocity * v < 0) {
+    s = position + ((velocity + v) * dt) / 2;
+    v = 0;
+  }
   let hitEnd: "min" | "max" | null = null;
   if (s <= TRACK_MIN_M) {
     s = TRACK_MIN_M;
@@ -249,18 +255,14 @@ export function generateForcesExamQuestions(): ExamQuestion[] {
       paperRef: "0625/41 · Newton’s 1st law",
       prompt:
         "The two forces on a trolley are equal and opposite. The trolley is already moving. It will…",
-      kind: "text",
-      expected: 0,
-      unit: "",
-      acceptedText: [
-        "constant speed",
-        "constant velocity",
-        "steady speed",
-        "uniform velocity",
-        "keep moving",
-        "continue at constant",
+      kind: "choice",
+      options: [
+        "Come to rest because the forces are balanced",
+        "Continue at constant velocity",
+        "Accelerate in the direction of motion",
+        "Change direction",
       ],
-      tolerancePct: 0,
+      correctIndex: 1,
       working: {
         equation: "F_res = 0 ⇒ a = 0",
         substitution: "Velocity does not change",

@@ -68,7 +68,17 @@ export function FloatingSim({ onBackToHome }: Props) {
           <div className="rounded-xl border border-border-subtle bg-surface p-3">
             <Slider label="Object density" value={state.objectDensity} min={200} max={2000} step={10} unit="kg/m³" onChange={(objectDensity) => setState((s) => ({ ...s, objectDensity }))} />
             <Slider label="Liquid density" value={state.liquidDensity} min={600} max={1400} step={10} unit="kg/m³" onChange={(liquidDensity) => setState((s) => ({ ...s, liquidDensity }))} />
-            <Slider label="Volume" value={state.volumeM3} min={0.0005} max={0.005} step={0.0001} unit="m³" onChange={(volumeM3) => setState((s) => ({ ...s, volumeM3 }))} />
+            <Slider
+              label="Volume"
+              value={state.volumeM3 * 1_000_000}
+              min={500}
+              max={5000}
+              step={100}
+              unit="cm³"
+              onChange={(volumeCm3) =>
+                setState((s) => ({ ...s, volumeM3: volumeCm3 / 1_000_000 }))
+              }
+            />
             <p className="mt-3 text-xs leading-relaxed text-ink-muted">
               Floats when object density is less than liquid density — then V_sub/V equals ρ_object/ρ_liquid. Sinks when weight exceeds maximum upthrust.
             </p>

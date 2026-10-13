@@ -58,7 +58,14 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
       const st = stateRef.current;
       if (st.running) {
         const inst = computeForces(st, vRef.current);
-        const next = stepMotion(sRef.current, vRef.current, inst.acceleration, dt);
+        const next = stepMotion(
+          sRef.current,
+          vRef.current,
+          inst.acceleration,
+          dt,
+          st.frictionN,
+          inst.appliedN,
+        );
         vRef.current = next.velocity;
         sRef.current = next.position;
         timeRef.current += dt;

@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { format3SF } from "@/lib/format";
 import type { CircuitEvaluation, CircuitState, PathComponent, Section, TrayType } from "./physics";
+import { resistorValueLabel } from "./physics";
 
 const VW = 680;
 const VH = 360;
@@ -50,16 +51,18 @@ function ResistorSymbol({
   x,
   y,
   label,
+  value,
   live,
   voltage,
 }: {
   x: number;
   y: number;
   label: string;
+  value: number;
   live: boolean;
   voltage: number | null;
 }) {
-  const ohms = label.includes("20") ? "20 Ω" : "10 Ω";
+  const ohms = resistorValueLabel(value);
   const tag = label.split(" · ")[0];
   return (
     <g>
@@ -75,7 +78,7 @@ function ResistorSymbol({
         height="24"
         rx="3"
         fill="#182030"
-        stroke={ohms === "20 Ω" ? "#818CF8" : "#22D3EE"}
+        stroke={value === 20 ? "#818CF8" : "#22D3EE"}
         strokeWidth="1.8"
       />
       <text x={x} y={y + 4} textAnchor="middle" fill="#F1F5F9" fontSize="11" fontFamily="monospace" fontWeight="700">
@@ -195,7 +198,14 @@ export function SchematicCanvas({
         ) : c.kind === "lamp" ? (
           <LampSymbol x={x} y={y} label={c.label} live={isLive} current={i} voltage={isLive ? v : 0} />
         ) : (
-          <ResistorSymbol x={x} y={y} label={c.label} live={isLive} voltage={isLive ? v : live ? 0 : null} />
+          <ResistorSymbol
+            x={x}
+            y={y}
+            label={c.label}
+            value={c.value}
+            live={isLive}
+            voltage={isLive ? v : live ? 0 : null}
+          />
         )}
         <g
           className="cursor-pointer"

@@ -1,5 +1,5 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
-import { format3SF } from "@/lib/format";
+import { format3SF } from "../../../lib/format.ts";
 
 export type PathKind = "resistor" | "ammeter" | "lamp";
 export type TrayType = "resistor_10" | "resistor_20" | "lamp" | "ammeter" | "voltmeter";
@@ -127,6 +127,10 @@ export function componentFromTray(
   return { id: makeId("R"), kind: "resistor", value: 10, label: `R${serial} · 10 Ω` };
 }
 
+export function resistorValueLabel(value: number): string {
+  return `${Number.isInteger(value) ? value : format3SF(value)} Ω`;
+}
+
 export function getInitialCircuitState(): CircuitState {
   return { cellEmf: 6, internalR: 0, switchClosed: true, sections: [], voltmeterAcross: null };
 }
@@ -229,6 +233,14 @@ function loadResistanceOf(state: CircuitState): number {
   return rTot;
 }
 
+function hasZeroResistanceParallelBranch(state: CircuitState): boolean {
+  return state.sections.some(
+    (section) =>
+      section.type === "parallel" &&
+      section.branches.some((branch) => branchResistance(branch) === 0),
+  );
+}
+
 export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
   const empty = state.sections.length === 0;
   const loadsPresent = hasLoad(state);
@@ -253,7 +265,8 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
   }
 
   const switchOpen = !state.switchClosed;
-  const isShort = state.switchClosed && !empty && !loadsPresent;
+  const parallelShort = hasZeroResistanceParallelBranch(state);
+  const isShort = state.switchClosed && !empty && (!loadsPresent || parallelShort);
   const rInternal = Math.max(0, state.internalR);
   const rTotalIfClosed = (Number.isFinite(rLoad) ? rLoad : 0) + rInternal;
   const isClosed = state.switchClosed && loadsPresent && Number.isFinite(rLoad) && rLoad > 0.001;
@@ -380,8 +393,9 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
     coach =
       "Switch is open, so I = 0. A voltmeter across the cell still reads the e.m.f. Across a resistor it reads 0.";
   } else if (isShort) {
-    coach =
-      "There is no load — this is a short circuit. Current would be huge (limited only by internal resistance). Add a resistor or lamp.";
+    coach = parallelShort
+      ? "An ammeter in parallel is a short circuit; ammeters go in series."
+      : "There is no load — this is a short circuit. Current would be huge (limited only by internal resistance). Add a resistor or lamp.";
   } else if (!isClosed) {
     coach = "The conducting path is incomplete. Add a resistor to each open branch.";
   } else if (!task2 && !task4) {
@@ -543,11 +557,9 @@ export function generateCircuitsExamQuestions(): ExamQuestion[] {
       marks: 1,
       paperRef: "0625/41 · Meters",
       prompt: "An ammeter must be connected in…",
-      kind: "text",
-      expected: 0,
-      unit: "",
-      acceptedText: ["series"],
-      tolerancePct: 0,
+      kind: "choice",
+      options: ["In series", "In parallel", "Across the cell", "Across a resistor"],
+      correctIndex: 0,
       working: {
         equation: "Ammeter resistance ≈ 0 Ω",
         substitution: "Whole current must pass through it",

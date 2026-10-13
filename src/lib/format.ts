@@ -6,10 +6,25 @@ export function format3SF(value: number): string {
   if (!Number.isFinite(value)) return "—";
   if (value === 0) return "0.00";
   const abs = Math.abs(value);
+  if (abs < 1e-3 || abs > 1e5) {
+    const [mantissa, exponent] = value.toExponential(2).split("e");
+    const superscript = String(Number(exponent))
+      .replaceAll("-", "⁻")
+      .replaceAll("0", "⁰")
+      .replaceAll("1", "¹")
+      .replaceAll("2", "²")
+      .replaceAll("3", "³")
+      .replaceAll("4", "⁴")
+      .replaceAll("5", "⁵")
+      .replaceAll("6", "⁶")
+      .replaceAll("7", "⁷")
+      .replaceAll("8", "⁸")
+      .replaceAll("9", "⁹");
+    return `${mantissa} × 10${superscript}`;
+  }
   const exp = Math.floor(Math.log10(abs));
   const decimals = Math.max(0, 2 - exp);
-  if (decimals > 5) return value.toExponential(2);
-  return Number(value.toPrecision(3)).toFixed(Math.min(decimals, 3));
+  return Number(value.toPrecision(3)).toFixed(decimals);
 }
 
 export function isWithinTolerance(

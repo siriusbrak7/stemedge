@@ -10,6 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { format3SF, isWithinTolerance, parseStudentNumber } from "@/lib/format";
+import { isCorrectChoice, markTextAnswer } from "@/lib/exam-marking";
 
 export interface ExamQuestion {
   id: string;
@@ -18,11 +19,13 @@ export interface ExamQuestion {
   prompt: string;
   contextLines?: string[];
   paperRef?: string;
-  kind: "numeric" | "text";
-  expected: number;
-  unit: string;
-  acceptedText?: string[];
-  tolerancePct: number;
+  kind: "numeric" | "text" | "choice";
+  expected?: number;
+  unit?: string;
+  acceptedText?: string[][];
+  tolerancePct?: number;
+  options?: string[];
+  correctIndex?: number;
   working: { equation: string; substitution: string; answer: string };
   misconception?: string;
 }
@@ -34,14 +37,6 @@ interface ExamPlayerProps {
   paperLabel: string;
   questions: ExamQuestion[];
   onExit: () => void;
-}
-
-function markText(raw: string, q: ExamQuestion): boolean {
-  const normalised = raw.trim().toLowerCase().replace(/[^a-z0-9.×x+-]/g, "");
-  return (q.acceptedText ?? []).some((a) => {
-    const target = a.toLowerCase().replace(/[^a-z0-9.×x+-]/g, "");
-    return normalised === target || normalised.includes(target);
-  });
 }
 
 export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerProps) {
@@ -67,10 +62,12 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
     if (!trimmed) return;
     let ok = false;
     if (q.kind === "text") {
-      ok = markText(trimmed, q);
+      ok = markTextAnswer(trimmed, q.acceptedText ?? []);
+    } else if (q.kind === "choice") {
+      ok = isCorrectChoice(trimmed, q.correctIndex ?? -1);
     } else {
       const n = parseStudentNumber(trimmed);
-      ok = n !== null && isWithinTolerance(n, q.expected, q.tolerancePct);
+      ok = n !== null && q.expected !== undefined && isWithinTolerance(n, q.expected, q.tolerancePct ?? 0);
     }
     const nextMark: Mark = ok ? "correct" : "wrong";
     setMark(nextMark);
@@ -197,26 +194,52 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
           </div>
         )}
 
-        <div className="flex items-center gap-2">
-          <input
-            type={q.kind === "text" ? "text" : "number"}
-            step="any"
-            value={input}
-            disabled={mark !== "idle"}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && mark === "idle") submit();
-              if (e.key === "Enter" && mark !== "idle") next();
-            }}
-            placeholder={q.kind === "text" ? "Type your answer…" : "Enter value (3 s.f.)"}
-            className="min-h-11 flex-1 rounded-xl border border-border-subtle bg-inset px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent/50 focus:outline-none disabled:opacity-60"
-          />
-          {q.kind === "numeric" && q.unit && (
+        {q.kind === "choice" ? (
+          <div role="radiogroup" aria-label="Answer options" className="grid gap-2">
+            {(q.options ?? []).map((option, optionIndex) => (
+              <label
+                key={option}
+                className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm ${
+                  input === String(optionIndex)
+                    ? "border-accent bg-accent/10 text-ink"
+                    : "border-border-subtle bg-inset text-ink-muted"
+                } ${mark !== "idle" ? "cursor-not-allowed opacity-70" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name={`answer-${q.id}`}
+                  value={optionIndex}
+                  checked={input === String(optionIndex)}
+                  disabled={mark !== "idle"}
+                  onChange={() => setInput(String(optionIndex))}
+                  className="accent-amber-400"
+                />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              type={q.kind === "text" ? "text" : "number"}
+              step="any"
+              value={input}
+              disabled={mark !== "idle"}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && mark === "idle") submit();
+                if (e.key === "Enter" && mark !== "idle") next();
+              }}
+              placeholder={q.kind === "text" ? "Type your answer…" : "Enter value (3 s.f.)"}
+              className="min-h-11 flex-1 rounded-xl border border-border-subtle bg-inset px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent/50 focus:outline-none disabled:opacity-60"
+            />
+            {q.kind === "numeric" && q.unit && (
             <span className="shrink-0 rounded-xl border border-border-subtle bg-inset px-3 py-2.5 font-mono text-xs font-bold text-accent">
               {q.unit}
             </span>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {mark === "idle" ? (
           <button
@@ -253,8 +276,10 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
               {mark !== "correct" && (
                 <span className="ml-auto font-mono text-xs text-ink-muted">
                   {q.kind === "text"
-                    ? `Expected: ${q.acceptedText?.[0] ?? q.working.answer}`
-                    : `Correct: ${format3SF(q.expected)} ${q.unit}`}
+                    ? `Expected: ${q.acceptedText?.[0]?.[0] ?? q.working.answer}`
+                    : q.kind === "choice"
+                      ? `Expected: ${q.options?.[q.correctIndex ?? -1] ?? q.working.answer}`
+                      : `Correct: ${format3SF(q.expected ?? 0)} ${q.unit ?? ""}`}
                 </span>
               )}
             </div>

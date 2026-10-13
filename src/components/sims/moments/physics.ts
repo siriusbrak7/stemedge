@@ -1,5 +1,5 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
-import { G_N_PER_KG } from "@/lib/format";
+import { G_N_PER_KG } from "../../../lib/format.ts";
 
 export const RULE_LENGTH_M = 1;
 export const SNAP_M = 0.01;
@@ -112,7 +112,8 @@ export function computeMoments(s: MomentsState): MomentsDerived {
   const cw = terms.filter((t) => t.sense === "cw").reduce((a, t) => a + t.momentNm, 0);
   const acw = terms.filter((t) => t.sense === "acw").reduce((a, t) => a + t.momentNm, 0);
   const net = cw - acw;
-  const balanced = Math.abs(net) < 0.08;
+  const largestMoment = Math.max(cw, acw);
+  const balanced = largestMoment > 0 && Math.abs(net) <= Math.max(0.005, 0.01 * largestMoment);
 
   return {
     terms,
@@ -268,11 +269,9 @@ export function generateMomentsExamQuestions(): ExamQuestion[] {
       marks: 1,
       paperRef: "0625/42 · Unit",
       prompt: "The SI unit of moment of a force is…",
-      kind: "text",
-      expected: 0,
-      unit: "",
-      acceptedText: ["n m", "newton metre", "nm", "n.m", "newton meter", "n·m"],
-      tolerancePct: 0,
+      kind: "choice",
+      options: ["N m (newton metre)", "N/m", "kg m/s", "W"],
+      correctIndex: 0,
       working: {
         equation: "moment = F × d",
         substitution: "N × m",

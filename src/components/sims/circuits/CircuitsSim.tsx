@@ -48,6 +48,10 @@ export function CircuitsSim({ onBackToHome }: Props) {
   }, [state.sections, state.internalR, state.switchClosed]);
 
   useEffect(() => {
+    if (state.sections.length === 0) serial.current = 1;
+  }, [state.sections.length]);
+
+  useEffect(() => {
     if (!evaluation.isClosed || !Number.isFinite(evaluation.totalCurrent)) return;
     const v = evaluation.terminalV;
     const i = evaluation.totalCurrent;
