@@ -100,7 +100,7 @@ export function FloatingSim({ onBackToHome }: Props) {
         </div>
         <div className="flex flex-col gap-3">
           <div className="rounded-xl border border-border-subtle bg-surface p-3">
-            <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+            <div aria-live="polite" aria-atomic="true" className="grid grid-cols-2 gap-2 font-mono text-xs">
               <FloatingReadout label="Density" value={`${format3SF(state.objectDensity)} kg/m³`} />
               <FloatingReadout label="Submerged" value={`${format3SF(d.fraction * 100)}%`} />
               <FloatingReadout label="Weight W" value={`${format3SF(d.weight)} N`} />

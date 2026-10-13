@@ -278,7 +278,7 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div aria-live="polite" aria-atomic="true" className="grid grid-cols-2 gap-2">
             <Readout
               label="Resultant F"
               value={`${format3SF(derived.resultantN)} N`}

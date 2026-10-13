@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   BookOpen,
   ChevronDown,
@@ -7,6 +8,8 @@ import {
   Layers,
   Magnet,
   Sparkles,
+  Moon,
+  Sun,
   Waves,
   Zap,
   Atom,
@@ -35,7 +38,7 @@ const SIM_LIST = [
     num: "01",
     title: "Resultant Forces & Motion",
     desc: "Forces on a block, resultant force, Newton's 2nd law (F = ma), and a live velocity–time graph.",
-    tags: ["Syllabus 1.5.1", "Paper 4 & 6", "Interactive v–t graph"],
+    tags: ["Syllabus 1.5.1", "Guided tasks", "Exam mode"],
     icon: Zap,
   },
   {
@@ -44,7 +47,7 @@ const SIM_LIST = [
     num: "02",
     title: "Principle of Moments",
     desc: "Drag masses on a metre rule, include the rule’s own weight, and see moment = F × d_perp.",
-    tags: ["Syllabus 1.5.2", "Equilibrium", "Beam balance"],
+    tags: ["Syllabus 1.5.2", "Guided tasks", "Exam mode"],
     icon: Layers,
   },
   {
@@ -53,7 +56,7 @@ const SIM_LIST = [
     num: "03",
     title: "Floating & Sinking",
     desc: "Density, Archimedes’ principle, upthrust, and the fraction of a body that sits below the waterline.",
-    tags: ["Syllabus 1.5.3", "Upthrust", "Density"],
+    tags: ["Syllabus 1.5.3", "Guided tasks", "Exam mode"],
     icon: Waves,
   },
   {
@@ -62,7 +65,7 @@ const SIM_LIST = [
     num: "04",
     title: "Electrical Circuits",
     desc: "Build series and parallel loops, place A and V correctly, and see Ohm’s law as a straight V–I line.",
-    tags: ["Syllabus 4.2", "V = IR", "Guided lab"],
+    tags: ["Syllabus 4.2", "Guided tasks", "Exam mode"],
     icon: Atom,
   },
   {
@@ -71,7 +74,7 @@ const SIM_LIST = [
     num: "05",
     title: "Light & Refraction",
     desc: "Snell’s law, refractive index n = sin i / sin r, and total internal reflection with critical angle.",
-    tags: ["Syllabus 3.2.3", "Snell’s law", "Ray optics"],
+    tags: ["Syllabus 3.2.3", "Guided tasks", "Exam mode"],
     icon: Sparkles,
   },
   {
@@ -80,7 +83,7 @@ const SIM_LIST = [
     num: "06",
     title: "Electromagnetism",
     desc: "Field around a current-carrying wire, motor effect, Fleming’s left-hand rule, and F = BIL.",
-    tags: ["Syllabus 4.5", "Motor effect", "F = BIL"],
+    tags: ["Syllabus 4.5", "Guided tasks", "Exam mode"],
     icon: Magnet,
   },
 ];
@@ -95,9 +98,32 @@ const SIM_SHORT_NAMES: Record<SimView, string> = {
   electromagnetism_sim: "Electromagnetism",
 };
 
+const ROUTE_TO_VIEW: Record<string, SimView> = {
+  forces: "forces_sim",
+  moments: "moments_sim",
+  floating: "floating_sim",
+  circuits: "circuits_sim",
+  refraction: "refraction_sim",
+  electromagnetism: "electromagnetism_sim",
+};
+
+const VIEW_TO_ROUTE: Partial<Record<SimView, string>> = Object.fromEntries(
+  Object.entries(ROUTE_TO_VIEW).map(([route, view]) => [view, route]),
+);
+
 export default function App() {
-  const [currentView, setCurrentView] = useState<SimView>("home");
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (router) => router.location.pathname });
+  const routeSimId = pathname.split("/")[2] ?? "";
+  const currentView = ROUTE_TO_VIEW[routeSimId] ?? "home";
+  const setCurrentView = useCallback((view: SimView) => {
+    const simId = VIEW_TO_ROUTE[view];
+    if (simId) navigate({ to: "/sim/$simId", params: { simId } });
+    else navigate({ to: "/" });
+  }, [navigate]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [focusIndex, setFocusIndex] = useState(0);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -112,16 +138,70 @@ export default function App() {
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("stemedge:theme");
+      setTheme(stored === "light" || stored === "dark" ? stored : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    } catch {
+      setTheme(matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    try {
+      localStorage.setItem("stemedge:theme", theme);
+    } catch {
+      // Theme remains active for the current page if storage is unavailable.
+    }
+  }, [theme]);
+
   const handleChipKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         setDropdownOpen((prev) => !prev);
       }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const activeIndex = SIM_LIST.findIndex((sim) => sim.view === currentView);
+        setFocusIndex(
+          activeIndex >= 0
+            ? activeIndex
+            : e.key === "ArrowDown"
+              ? 0
+              : SIM_LIST.length - 1,
+        );
+        setDropdownOpen(true);
+      }
       if (e.key === "Escape") setDropdownOpen(false);
     },
-    [],
+    [currentView],
   );
+
+  useEffect(() => {
+    if (dropdownOpen) itemRefs.current[focusIndex]?.focus();
+  }, [dropdownOpen, focusIndex]);
+
+  function handleListboxKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const currentIndex = itemRefs.current.findIndex((item) => item === document.activeElement);
+    let nextIndex: number | null = null;
+    if (e.key === "ArrowDown") nextIndex = (Math.max(currentIndex, 0) + 1) % SIM_LIST.length;
+    if (e.key === "ArrowUp") nextIndex = (Math.max(currentIndex, 0) - 1 + SIM_LIST.length) % SIM_LIST.length;
+    if (e.key === "Home") nextIndex = 0;
+    if (e.key === "End") nextIndex = SIM_LIST.length - 1;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setDropdownOpen(false);
+      chipRef.current?.focus();
+      return;
+    }
+    if (nextIndex !== null) {
+      e.preventDefault();
+      setFocusIndex(nextIndex);
+    }
+  }
 
   const isOnSim = currentView !== "home";
   const chipLabel = isOnSim ? `Current: ${SIM_SHORT_NAMES[currentView]}` : "Select simulation";
@@ -153,6 +233,15 @@ export default function App() {
         </button>
 
         <div className="flex items-center gap-2.5" ref={dropdownRef}>
+          <button
+            type="button"
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border-subtle text-ink-muted hover:text-accent"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           <button
             type="button"
             onClick={() => setCurrentView("home")}
@@ -190,6 +279,7 @@ export default function App() {
               <div
                 role="listbox"
                 aria-label="Select a simulation"
+                onKeyDown={handleListboxKeyDown}
                 className="absolute right-0 top-full z-50 mt-1.5 w-64 overflow-hidden rounded-xl border border-border-subtle bg-canvas-elevated shadow-2xl"
               >
                 {SIM_LIST.map((sim, idx) => {
@@ -207,6 +297,7 @@ export default function App() {
                       onClick={() => {
                         setCurrentView(sim.view);
                         setDropdownOpen(false);
+                        chipRef.current?.focus();
                       }}
                       className={`flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-xs font-medium transition-colors ${
                         isActive
@@ -290,17 +381,7 @@ function Directory({ onOpen }: { onOpen: (view: SimView) => void }) {
             calculations with SI units and 3 s.f. mark schemes.
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-          <button
-            type="button"
-            onClick={() => onOpen("forces_sim")}
-            className="flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-fg shadow-md transition-colors hover:bg-amber-400"
-          >
-            <Zap className="h-4 w-4" />
-            Launch simulation #1
-          </button>
-          <span className="font-mono text-[11px] text-ink-faint">g = 9.8 N/kg · SI units</span>
-        </div>
+        <span className="shrink-0 font-mono text-[11px] text-ink-faint">g = 9.8 N/kg · SI units</span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -318,7 +399,7 @@ function Directory({ onOpen }: { onOpen: (view: SimView) => void }) {
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs font-bold text-ink-faint">{sim.num}</span>
                   <span className="rounded border border-accent/30 bg-accent/20 px-2 py-0.5 font-mono text-[10px] font-semibold text-amber-300">
-                    Explore + exam
+                    Guided tasks · Exam mode
                   </span>
                 </div>
                 <div className="flex items-center gap-2.5">

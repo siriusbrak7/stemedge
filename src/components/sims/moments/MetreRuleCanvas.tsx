@@ -48,6 +48,24 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
     return snapPos((x - RULE_X0) / PX_PER_M);
   }
 
+  function nudgeLoad(id: string, direction: -1 | 1, large = false) {
+    const step = large ? 0.05 : 0.01;
+    onChange({
+      ...state,
+      loads: state.loads.map((load) =>
+        load.id === id ? { ...load, posM: snapPos(load.posM + direction * step) } : load,
+      ),
+    });
+  }
+
+  function handlePivotKeyDown(event: React.KeyboardEvent<SVGRectElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    const step = event.shiftKey ? 0.05 : 0.01;
+    onChange({ ...state, pivotM: Math.max(0.1, Math.min(0.9, snapPos(state.pivotM + direction * step))) });
+  }
+
   function rulePoint(point: { x: number; y: number }) {
     const radians = (-tilt * Math.PI) / 180;
     const dx = point.x - pivotX;
@@ -165,7 +183,11 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
           height="80"
           fill="transparent"
           className="cursor-ew-resize"
+          tabIndex={0}
+          role="slider"
+          aria-label={`Pivot position ${Math.round(state.pivotM * 100)} cm; use left and right arrows to move`}
           onPointerDown={onPointerDownPivot}
+          onKeyDown={handlePivotKeyDown}
         />
 
         <g style={{ transform: `rotate(${tilt}deg)`, transformOrigin: `${pivotX}px ${RULE_Y}px`, transition: "transform 280ms ease-out" }}>
@@ -200,6 +222,7 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
               key={load.id}
               load={load}
               onPointerDown={(ev) => onPointerDownLoad(ev, load.id)}
+              onNudge={(direction, large) => nudgeLoad(load.id, direction, large)}
             />
           ))}
 
@@ -261,14 +284,27 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
 function MassBlock({
   load,
   onPointerDown,
+  onNudge,
 }: {
   load: Load;
   onPointerDown: (e: React.PointerEvent) => void;
+  onNudge: (direction: -1 | 1, large: boolean) => void;
 }) {
   const x = xOf(load.posM);
   const h = 18 + load.massKg * 10;
   return (
-    <g className="cursor-grab" onPointerDown={onPointerDown}>
+    <g
+      className="cursor-grab"
+      tabIndex={0}
+      role="button"
+      aria-label={`${load.hidden ? "Mystery mass" : `${load.massKg} kg mass`} at ${Math.round(load.posM * 100)} cm; use arrow keys to nudge`}
+      onPointerDown={onPointerDown}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        onNudge(event.key === "ArrowRight" ? 1 : -1, event.shiftKey);
+      }}
+    >
       <line x1={x} y1={RULE_Y - 7} x2={x} y2={RULE_Y - 7 - 8} stroke="#94A3B8" />
       <rect
         x={x - 18}

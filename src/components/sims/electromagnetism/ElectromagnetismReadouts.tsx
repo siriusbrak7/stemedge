@@ -11,7 +11,7 @@ interface Props {
 export function ElectromagnetismReadouts({ state, calculated }: Props) {
   const none = state.currentA < 0.001;
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-border-subtle bg-surface p-3">
+    <div role="status" aria-live="polite" aria-atomic="true" className="flex flex-col gap-2.5 rounded-xl border border-border-subtle bg-surface p-3">
       <div className="flex items-center gap-2 border-b border-border-faint pb-1">
         <Activity className="h-3.5 w-3.5 text-accent" />
         <span className="font-mono text-xs font-bold uppercase tracking-widest text-accent">Live readouts</span>

@@ -56,7 +56,7 @@ export function CircuitReadouts({ evaluation, state, samples, readings, onRecord
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div aria-live="polite" aria-atomic="true" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Meter label="e.m.f. E" value={format3SF(evaluation.cellEmf)} unit="V" hint="Cell (chemical)" accent />
         <Meter
           label="Terminal p.d."
