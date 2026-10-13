@@ -30,7 +30,7 @@ export function RefractionSim({ onBackToHome }: Props) {
     return (
       <div className="flex flex-col gap-4">
         <SimHeader title="Light & Refraction" syllabus="Syllabus 3.2.3" simNumber="#05" mode={mode} onMode={setMode} examLabel="Exam mode" onBackToHome={onBackToHome} />
-        <ExamPlayer title="Snell’s law and TIR" paperLabel="Cambridge IGCSE 0625 · Paper 4" questions={generateRefractionExamQuestions()} onExit={() => setMode("explore")} />
+        <ExamPlayer simId="refraction" title="Snell’s law and TIR" paperLabel="Cambridge IGCSE 0625 · Paper 4" questionFactory={generateRefractionExamQuestions} onExit={() => setMode("explore")} />
       </div>
     );
   }

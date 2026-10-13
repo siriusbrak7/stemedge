@@ -47,9 +47,10 @@ export function ElectromagnetismSim({ onBackToHome }: Props) {
           onBackToHome={onBackToHome}
         />
         <ExamPlayer
+          simId="electromagnetism"
           title="Electromagnetism & motor effect"
           paperLabel="Cambridge IGCSE 0625 · Paper 4"
-          questions={generateElectromagnetismExamQuestions()}
+          questionFactory={generateElectromagnetismExamQuestions}
           onExit={() => setMode("explore")}
         />
       </div>

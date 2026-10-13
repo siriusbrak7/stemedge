@@ -1,4 +1,5 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
+import { seededPick } from "../../../lib/seeded-choice.ts";
 
 export interface RefractionState {
   n2: number;
@@ -62,22 +63,25 @@ export function evaluateRefractionTasks(
   };
 }
 
-export function generateRefractionExamQuestions(): ExamQuestion[] {
+export function generateRefractionExamQuestions(seed = 1): ExamQuestion[] {
+  const incidenceDeg = seededPick(seed, "refraction-r1-incidence", [35, 40, 45]);
+  const refractionDeg = seededPick(seed, "refraction-r1-refraction", [20, 25, 30]);
+  const refractiveIndex = Math.sin((incidenceDeg * Math.PI) / 180) / Math.sin((refractionDeg * Math.PI) / 180);
   return [
     {
       id: "r1",
       number: 1,
       marks: 2,
       paperRef: "0625/43 · Snell’s law",
-      prompt: "A ray in air (n = 1.00) hits glass at 40° and refracts at 25°. Calculate n of the glass.",
+      prompt: `A ray in air (n = 1.00) hits glass at ${incidenceDeg}° and refracts at ${refractionDeg}°. Calculate n of the glass.`,
       kind: "numeric",
-      expected: 1.52,
+      expected: refractiveIndex,
       unit: "",
       tolerancePct: 2.5,
       working: {
         equation: "n = sin i / sin r",
-        substitution: "sin 40° / sin 25° = 1.52",
-        answer: "1.52",
+        substitution: `sin ${incidenceDeg}° / sin ${refractionDeg}° = ${refractiveIndex.toFixed(2)}`,
+        answer: refractiveIndex.toFixed(2),
       },
       misconception: "Do not divide the angles. Use sines.",
     },

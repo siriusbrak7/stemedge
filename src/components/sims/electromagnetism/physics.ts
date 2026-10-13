@@ -1,5 +1,6 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
 import { format3SF } from "../../../lib/format.ts";
+import { seededPick } from "../../../lib/seeded-choice.ts";
 
 export type EmSubMode = "motor" | "field" | "fleming";
 
@@ -115,24 +116,27 @@ export function evaluateElectromagnetismTasks(
   };
 }
 
-export function generateElectromagnetismExamQuestions(): ExamQuestion[] {
+export function generateElectromagnetismExamQuestions(seed = 1): ExamQuestion[] {
+  const bFieldT = seededPick(seed, "em-e1-field", [0.15, 0.2, 0.25]);
+  const currentA = seededPick(seed, "em-e1-current", [3, 4, 5]);
+  const lengthM = seededPick(seed, "em-e1-length", [0.4, 0.5, 0.6]);
+  const forceN = bFieldT * currentA * lengthM;
   return [
     {
       id: "e1",
       number: 1,
       marks: 2,
       paperRef: "0625/42 · Motor effect",
-      prompt:
-        "A wire of length 0.50 m carries a current of 4.0 A in a magnetic field of flux density 0.20 T. The field is perpendicular to the wire. Calculate the force on the wire.",
-      contextLines: ["B = 0.20 T", "I = 4.0 A", "L = 0.50 m"],
+      prompt: `A wire of length ${lengthM.toFixed(2)} m carries a current of ${currentA.toFixed(1)} A in a magnetic field of flux density ${bFieldT.toFixed(2)} T. The field is perpendicular to the wire. Calculate the force on the wire.`,
+      contextLines: [`B = ${bFieldT.toFixed(2)} T`, `I = ${currentA.toFixed(1)} A`, `L = ${lengthM.toFixed(2)} m`],
       kind: "numeric",
-      expected: 0.4,
+      expected: forceN,
       unit: "N",
       tolerancePct: 2,
       working: {
         equation: "F = B I L",
-        substitution: "0.20 × 4.0 × 0.50 = 0.40",
-        answer: "0.400 N",
+        substitution: `${bFieldT.toFixed(2)} × ${currentA.toFixed(1)} × ${lengthM.toFixed(2)} = ${forceN.toFixed(3)}`,
+        answer: `${forceN.toFixed(3)} N`,
       },
       misconception: "Do not forget L is the length in the field, in metres not centimetres.",
     },

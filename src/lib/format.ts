@@ -38,8 +38,38 @@ export function isWithinTolerance(
 }
 
 export function parseStudentNumber(raw: string): number | null {
-  const cleaned = raw.trim().replace(/,/g, "");
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+  return parseStudentAnswer(raw).value;
+}
+
+export function parseStudentAnswer(raw: string): { value: number | null; unit: string } {
+  const superscripts: Record<string, string> = {
+    "⁰": "0",
+    "¹": "1",
+    "²": "2",
+    "³": "3",
+    "⁴": "4",
+    "⁵": "5",
+    "⁶": "6",
+    "⁷": "7",
+    "⁸": "8",
+    "⁹": "9",
+    "⁻": "-",
+    "⁺": "+",
+  };
+  const cleaned = raw
+    .trim()
+    .replace(/,/g, "")
+    .replaceAll("×", "x")
+    .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺]/g, (character) => superscripts[character] ?? character);
+  const match = cleaned.match(
+    /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))(?:\s*(?:[eE]([+-]?\d+)|[xX]\s*10\s*\^?\s*([+-]?\d+)))?\s*(.*)$/,
+  );
+  if (!match) return { value: null, unit: "" };
+  const mantissa = Number(match[1]);
+  const exponent = Number(match[2] ?? match[3] ?? 0);
+  const value = mantissa * 10 ** exponent;
+  return {
+    value: Number.isFinite(value) ? value : null,
+    unit: match[4].trim(),
+  };
 }

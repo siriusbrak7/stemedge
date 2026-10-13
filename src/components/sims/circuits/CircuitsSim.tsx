@@ -206,9 +206,10 @@ export function CircuitsSim({ onBackToHome }: Props) {
           onBackToHome={onBackToHome}
         />
         <ExamPlayer
+          simId="circuits"
           title="Electrical circuits & Ohm’s law"
           paperLabel="Cambridge IGCSE 0625 · Paper 4"
-          questions={generateCircuitsExamQuestions()}
+          questionFactory={generateCircuitsExamQuestions}
           onExit={() => setMode("explore")}
         />
       </div>

@@ -81,9 +81,10 @@ export function MomentsSim({ onBackToHome }: Props) {
           onBackToHome={onBackToHome}
         />
         <ExamPlayer
+          simId="moments"
           title="Moments, equilibrium and perpendicular distance"
           paperLabel="Cambridge IGCSE 0625 · Paper 4"
-          questions={generateMomentsExamQuestions()}
+          questionFactory={generateMomentsExamQuestions}
           onExit={() => setMode("explore")}
         />
       </div>

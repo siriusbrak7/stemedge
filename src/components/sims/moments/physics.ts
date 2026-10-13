@@ -1,5 +1,6 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
 import { G_N_PER_KG } from "../../../lib/format.ts";
+import { seededPick } from "../../../lib/seeded-choice.ts";
 
 export const RULE_LENGTH_M = 1;
 export const SNAP_M = 0.01;
@@ -187,23 +188,26 @@ export function computeAngleMoment(s: AngleState) {
   return { sin, dPerp, momentNm };
 }
 
-export function generateMomentsExamQuestions(): ExamQuestion[] {
+export function generateMomentsExamQuestions(seed = 1): ExamQuestion[] {
+  const forceN = seededPick(seed, "moments-m1-force", [2.5, 3, 4]);
+  const distanceM = seededPick(seed, "moments-m1-distance", [0.3, 0.4, 0.5]);
+  const momentNm = forceN * distanceM;
   return [
     {
       id: "m1",
       number: 1,
       marks: 2,
       paperRef: "0625/42 · Moment of a force",
-      prompt: "A 3.0 N force acts 0.40 m from a pivot, perpendicular to the beam. Calculate the moment.",
-      contextLines: ["F = 3.0 N", "d = 0.40 m"],
+      prompt: `A ${forceN.toFixed(1)} N force acts ${distanceM.toFixed(2)} m from a pivot, perpendicular to the beam. Calculate the moment.`,
+      contextLines: [`F = ${forceN.toFixed(1)} N`, `d = ${distanceM.toFixed(2)} m`],
       kind: "numeric",
-      expected: 1.2,
+      expected: momentNm,
       unit: "N m",
       tolerancePct: 2,
       working: {
         equation: "moment = F × d",
-        substitution: "3.0 × 0.40 = 1.20",
-        answer: "1.20 N m",
+        substitution: `${forceN.toFixed(1)} × ${distanceM.toFixed(2)} = ${momentNm.toFixed(2)}`,
+        answer: `${momentNm.toFixed(2)} N m`,
       },
       misconception: "d must be the perpendicular distance from the pivot to the line of action.",
     },

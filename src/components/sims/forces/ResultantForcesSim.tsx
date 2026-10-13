@@ -169,9 +169,10 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
           onBackToHome={onBackToHome}
         />
         <ExamPlayer
+          simId="forces"
           title="Forces, Newton’s laws and graphs"
           paperLabel="Cambridge IGCSE 0625 · Paper 4"
-          questions={generateForcesExamQuestions()}
+          questionFactory={generateForcesExamQuestions}
           onExit={() => setMode("explore")}
         />
       </div>

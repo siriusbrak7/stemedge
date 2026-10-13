@@ -1,4 +1,8 @@
+import { isWithinTolerance, parseStudentAnswer } from "./format.ts";
+
 export type TextAnswerGroups = readonly (readonly string[])[];
+
+export type StudentUnitStatus = "not-required" | "omitted" | "correct" | "incorrect";
 
 const NEGATION_WORDS = new Set(["not", "no", "never"]);
 
@@ -35,4 +39,33 @@ export function markTextAnswer(raw: string, groups: TextAnswerGroups): boolean {
 
 export function isCorrectChoice(selected: string, correctIndex: number): boolean {
   return Number.isInteger(correctIndex) && Number(selected) === correctIndex;
+}
+
+function normalizeUnit(unit: string): string {
+  return unit
+    .toLowerCase()
+    .replaceAll("²", "2")
+    .replaceAll("³", "3")
+    .replaceAll("°", "deg")
+    .replaceAll("Ω", "ohm")
+    .replace(/[\s·⋅]/g, "");
+}
+
+export function studentUnitStatus(raw: string, expectedUnit: string): StudentUnitStatus {
+  if (!expectedUnit) return "not-required";
+  const supplied = parseStudentAnswer(raw).unit;
+  if (!supplied) return "omitted";
+  return normalizeUnit(supplied) === normalizeUnit(expectedUnit) ? "correct" : "incorrect";
+}
+
+export function numericAnswerMarks(
+  raw: string,
+  expected: number,
+  tolerancePct: number,
+  unit: string,
+  maxMarks: number,
+): number {
+  const value = parseStudentAnswer(raw).value;
+  if (value === null || !isWithinTolerance(value, expected, tolerancePct)) return 0;
+  return studentUnitStatus(raw, unit) === "incorrect" ? Math.max(0, maxMarks - 1) : maxMarks;
 }

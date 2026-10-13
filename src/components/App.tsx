@@ -17,6 +17,7 @@ import { FloatingSim } from "@/components/sims/floating/FloatingSim";
 import { CircuitsSim } from "@/components/sims/circuits/CircuitsSim";
 import { RefractionSim } from "@/components/sims/refraction/RefractionSim";
 import { ElectromagnetismSim } from "@/components/sims/electromagnetism/ElectromagnetismSim";
+import { getBestExamScore } from "@/lib/exam-scores";
 
 export type SimView =
   | "home"
@@ -262,6 +263,14 @@ export default function App() {
 }
 
 function Directory({ onOpen }: { onOpen: (view: SimView) => void }) {
+  const [bestScores, setBestScores] = useState<Record<string, ReturnType<typeof getBestExamScore>>>({});
+
+  useEffect(() => {
+    setBestScores(
+      Object.fromEntries(SIM_LIST.map((sim) => [sim.id, getBestExamScore(sim.id)])),
+    );
+  }, []);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border-subtle bg-surface p-6 sm:flex-row sm:items-center">
@@ -297,6 +306,7 @@ function Directory({ onOpen }: { onOpen: (view: SimView) => void }) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {SIM_LIST.map((sim) => {
           const IconComponent = sim.icon;
+          const bestScore = bestScores[sim.id];
           return (
             <button
               key={sim.id}
@@ -315,7 +325,14 @@ function Directory({ onOpen }: { onOpen: (view: SimView) => void }) {
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/15 text-accent">
                     <IconComponent className="h-5 w-5" />
                   </div>
-                  <h3 className="text-base font-bold text-ink">{sim.title}</h3>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-ink">{sim.title}</h3>
+                    {bestScore && (
+                      <p className="mt-0.5 font-mono text-[10px] text-accent">
+                        Best {bestScore.earned}/{bestScore.maximum}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <p className="text-xs leading-relaxed text-ink-muted">{sim.desc}</p>
               </div>

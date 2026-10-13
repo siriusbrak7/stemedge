@@ -1,4 +1,5 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
+import { seededPick } from "../../../lib/seeded-choice.ts";
 
 export const TRACK_MIN_M = 0;
 export const TRACK_MAX_M = 16;
@@ -215,24 +216,29 @@ export function evaluateMotionTasks(args: {
   return { 1: coasting, 2: sloping, 3: heavy, 4: withFriction };
 }
 
-export function generateForcesExamQuestions(): ExamQuestion[] {
+export function generateForcesExamQuestions(seed = 1): ExamQuestion[] {
+  const rightForce = seededPick(seed, "forces-f1-right", [9, 10, 11, 12]);
+  const leftForce = seededPick(seed, "forces-f1-left", [3, 4, 5]);
+  const resultant = rightForce - leftForce;
+  const rightText = rightForce.toFixed(1);
+  const leftText = leftForce.toFixed(1);
+  const resultantText = resultant.toFixed(1);
   return [
     {
       id: "f1",
       number: 1,
       marks: 2,
       paperRef: "0625/41 · Resultant force",
-      prompt:
-        "A trolley is pulled 10 N to the right and 4.0 N to the left. Calculate the resultant force.",
-      contextLines: ["F_right = 10 N", "F_left = 4.0 N"],
+      prompt: `A trolley is pulled ${rightText} N to the right and ${leftText} N to the left. Calculate the resultant force.`,
+      contextLines: [`F_right = ${rightText} N`, `F_left = ${leftText} N`],
       kind: "numeric",
-      expected: 6,
+      expected: resultant,
       unit: "N",
       tolerancePct: 2,
       working: {
         equation: "F_res = F_right − F_left",
-        substitution: "10 − 4.0 = 6.0",
-        answer: "6.00 N (to the right)",
+        substitution: `${rightText} − ${leftText} = ${resultantText}`,
+        answer: `${resultant.toFixed(2)} N (to the right)`,
       },
       misconception: "Do not add the forces. Resultant is the vector difference.",
     },
@@ -241,16 +247,16 @@ export function generateForcesExamQuestions(): ExamQuestion[] {
       number: 2,
       marks: 2,
       paperRef: "0625/41 · Newton’s 2nd law",
-      prompt: "The trolley in Q1 has mass 2.0 kg. Calculate its acceleration.",
-      contextLines: ["F_res = 6.0 N", "m = 2.0 kg"],
+      prompt: `The trolley in Q1 has mass 2.0 kg. Calculate its acceleration.`,
+      contextLines: [`F_res = ${resultantText} N`, "m = 2.0 kg"],
       kind: "numeric",
-      expected: 3,
+      expected: resultant / 2,
       unit: "m/s²",
       tolerancePct: 2,
       working: {
         equation: "a = F / m",
-        substitution: "6.0 / 2.0 = 3.0",
-        answer: "3.00 m/s²",
+        substitution: `${resultantText} / 2.0 = ${(resultant / 2).toFixed(1)}`,
+        answer: `${(resultant / 2).toFixed(2)} m/s²`,
       },
       misconception: "Use the resultant force, not one of the applied forces.",
     },

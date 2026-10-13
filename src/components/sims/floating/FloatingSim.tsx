@@ -45,7 +45,7 @@ export function FloatingSim({ onBackToHome }: Props) {
     return (
       <div className="flex flex-col gap-4">
         <SimHeader title="Floating & Sinking" syllabus="Syllabus 1.5.3" simNumber="#03" mode={mode} onMode={setMode} examLabel="Exam mode" onBackToHome={onBackToHome} />
-        <ExamPlayer title="Density and Archimedes" paperLabel="Cambridge IGCSE 0625 · Paper 4" questions={generateFloatingExamQuestions()} onExit={() => setMode("explore")} />
+        <ExamPlayer simId="floating" title="Density and Archimedes" paperLabel="Cambridge IGCSE 0625 · Paper 4" questionFactory={generateFloatingExamQuestions} onExit={() => setMode("explore")} />
       </div>
     );
   }

@@ -1,5 +1,6 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
 import { G_N_PER_KG } from "../../../lib/format.ts";
+import { seededPick } from "../../../lib/seeded-choice.ts";
 
 export interface FloatingState {
   objectDensity: number;
@@ -50,22 +51,25 @@ export function evaluateFloatingTasks(
   };
 }
 
-export function generateFloatingExamQuestions(): ExamQuestion[] {
+export function generateFloatingExamQuestions(seed = 1): ExamQuestion[] {
+  const massKg = seededPick(seed, "floating-fl1-mass", [0.18, 0.24, 0.3]);
+  const volumeM3 = seededPick(seed, "floating-fl1-volume", [0.00015, 0.0002, 0.00025]);
+  const density = massKg / volumeM3;
   return [
     {
       id: "fl1",
       number: 1,
       marks: 2,
       paperRef: "0625/41 · Density",
-      prompt: "A block has mass 0.24 kg and volume 2.0 × 10⁻⁴ m³. Calculate its density.",
+      prompt: `A block has mass ${massKg.toFixed(2)} kg and volume ${volumeM3.toExponential(1)} m³. Calculate its density.`,
       kind: "numeric",
-      expected: 1200,
+      expected: density,
       unit: "kg/m³",
       tolerancePct: 2,
       working: {
         equation: "ρ = m / V",
-        substitution: "0.24 / 2.0×10⁻⁴ = 1200",
-        answer: "1200 kg/m³",
+        substitution: `${massKg.toFixed(2)} / ${volumeM3.toExponential(1)} = ${density.toFixed(1)}`,
+        answer: `${density.toFixed(2)} kg/m³`,
       },
     },
     {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -9,8 +9,10 @@ import {
   RotateCcw,
   XCircle,
 } from "lucide-react";
-import { format3SF, isWithinTolerance, parseStudentNumber } from "@/lib/format";
-import { isCorrectChoice, markTextAnswer } from "@/lib/exam-marking";
+import { format3SF } from "@/lib/format";
+import { isCorrectChoice, markTextAnswer, numericAnswerMarks } from "@/lib/exam-marking";
+import { saveBestExamScore } from "@/lib/exam-scores";
+import { nextAttemptSeed } from "@/lib/seeded-choice";
 
 export interface ExamQuestion {
   id: string;
@@ -30,21 +32,29 @@ export interface ExamQuestion {
   misconception?: string;
 }
 
-type Mark = "idle" | "correct" | "wrong";
+type Mark = "idle" | "correct" | "partial" | "wrong";
 
 interface ExamPlayerProps {
+  simId: string;
   title: string;
   paperLabel: string;
-  questions: ExamQuestion[];
+  questionFactory: (seed: number) => ExamQuestion[];
   onExit: () => void;
 }
 
-export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerProps) {
+export function ExamPlayer({ simId, title, paperLabel, questionFactory, onExit }: ExamPlayerProps) {
+  const [attemptSeed, setAttemptSeed] = useState(() =>
+    [...simId].reduce((seed, character) => Math.imul(seed ^ character.charCodeAt(0), 16_777_619) >>> 0, 2_166_136_261),
+  );
+  const questions = useMemo(() => questionFactory(attemptSeed), [attemptSeed, questionFactory]);
   const [index, setIndex] = useState(0);
   const [input, setInput] = useState("");
   const [mark, setMark] = useState<Mark>("idle");
-  const [scores, setScores] = useState<Mark[]>([]);
+  const [scores, setScores] = useState<number[]>([]);
   const [summary, setSummary] = useState(false);
+  const answerRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
 
   const q = questions[index];
   const last = index === questions.length - 1;
@@ -52,7 +62,31 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
     () => questions.reduce((s, item) => s + item.marks, 0),
     [questions],
   );
-  const earned = questions.reduce((s, item, i) => (scores[i] === "correct" ? s + item.marks : s), 0);
+  const earned = scores.reduce((total, score) => total + score, 0);
+
+  useEffect(() => {
+    if (summary) {
+      summaryRef.current?.focus();
+    } else if (mark !== "idle") {
+      resultRef.current?.focus();
+    } else {
+      answerRef.current?.focus();
+    }
+  }, [attemptSeed, index, mark, summary]);
+
+  useEffect(() => {
+    try {
+      const random = new Uint32Array(1);
+      globalThis.crypto.getRandomValues(random);
+      setAttemptSeed(random[0]);
+    } catch {
+      setAttemptSeed(nextAttemptSeed(Date.now() ^ simId.length));
+    }
+  }, [simId]);
+
+  useEffect(() => {
+    if (summary) saveBestExamScore(simId, { earned, maximum: maxMarks });
+  }, [earned, maxMarks, simId, summary]);
 
   if (!q) return null;
 
@@ -60,22 +94,31 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
     if (mark !== "idle") return;
     const trimmed = input.trim();
     if (!trimmed) return;
-    let ok = false;
+    let awarded = 0;
     if (q.kind === "text") {
-      ok = markTextAnswer(trimmed, q.acceptedText ?? []);
+      awarded = markTextAnswer(trimmed, q.acceptedText ?? []) ? q.marks : 0;
     } else if (q.kind === "choice") {
-      ok = isCorrectChoice(trimmed, q.correctIndex ?? -1);
+      awarded = isCorrectChoice(trimmed, q.correctIndex ?? -1) ? q.marks : 0;
     } else {
-      const n = parseStudentNumber(trimmed);
-      ok = n !== null && q.expected !== undefined && isWithinTolerance(n, q.expected, q.tolerancePct ?? 0);
+      if (q.expected !== undefined) {
+        awarded = numericAnswerMarks(trimmed, q.expected, q.tolerancePct ?? 0, q.unit ?? "", q.marks);
+      }
     }
-    const nextMark: Mark = ok ? "correct" : "wrong";
+    const nextMark: Mark = awarded === q.marks ? "correct" : awarded > 0 ? "partial" : "wrong";
     setMark(nextMark);
     setScores((prev) => {
       const copy = [...prev];
-      copy[index] = nextMark;
+      copy[index] = awarded;
       return copy;
     });
+  }
+
+  function handlePlayerKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" || event.defaultPrevented) return;
+    if ((event.target as HTMLElement).closest("button")) return;
+    event.preventDefault();
+    if (mark === "idle") submit();
+    else next();
   }
 
   function next() {
@@ -94,11 +137,12 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
     setMark("idle");
     setScores([]);
     setSummary(false);
+    setAttemptSeed((seed) => nextAttemptSeed(seed));
   }
 
   if (summary) {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 py-8">
+      <div ref={summaryRef} tabIndex={-1} className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 py-8 focus:outline-none">
         <GraduationCap className="h-12 w-12 text-accent" />
         <div className="text-center">
           <h2 className="text-2xl font-extrabold text-ink">Paper complete</h2>
@@ -115,9 +159,11 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
             <div
               key={item.id}
               className={`flex h-8 w-8 items-center justify-center rounded-full border font-mono text-xs font-bold ${
-                scores[i] === "correct"
+                scores[i] === item.marks
                   ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                  : "border-rose-500/40 bg-rose-500/15 text-rose-300"
+                  : (scores[i] ?? 0) > 0
+                    ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+                    : "border-rose-500/40 bg-rose-500/15 text-rose-300"
               }`}
             >
               {item.number}
@@ -147,7 +193,7 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <div tabIndex={-1} onKeyDown={handlePlayerKeyDown} className="mx-auto flex w-full max-w-3xl flex-col gap-4 focus:outline-none">
       <div className="flex items-center justify-between gap-3">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted-bg">
           <div
@@ -206,6 +252,7 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
                 } ${mark !== "idle" ? "cursor-not-allowed opacity-70" : ""}`}
               >
                 <input
+                  ref={optionIndex === 0 ? answerRef : undefined}
                   type="radio"
                   name={`answer-${q.id}`}
                   value={optionIndex}
@@ -221,15 +268,13 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
         ) : (
           <div className="flex items-center gap-2">
             <input
-              type={q.kind === "text" ? "text" : "number"}
+              ref={answerRef}
+              type="text"
+              inputMode={q.kind === "numeric" ? "decimal" : "text"}
               step="any"
               value={input}
               disabled={mark !== "idle"}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && mark === "idle") submit();
-                if (e.key === "Enter" && mark !== "idle") next();
-              }}
               placeholder={q.kind === "text" ? "Type your answer…" : "Enter value (3 s.f.)"}
               className="min-h-11 flex-1 rounded-xl border border-border-subtle bg-inset px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint focus:border-accent/50 focus:outline-none disabled:opacity-60"
             />
@@ -252,26 +297,34 @@ export function ExamPlayer({ title, paperLabel, questions, onExit }: ExamPlayerP
           </button>
         ) : (
           <div
+            ref={resultRef}
+            tabIndex={-1}
             className={`flex flex-col gap-3 rounded-xl border p-4 ${
               mark === "correct"
                 ? "border-emerald-500/30 bg-emerald-500/10"
-                : "border-rose-500/30 bg-rose-500/10"
+                : mark === "partial"
+                  ? "border-amber-500/30 bg-amber-500/10"
+                  : "border-rose-500/30 bg-rose-500/10"
             }`}
           >
             <div className="flex items-center gap-2">
               {mark === "correct" ? (
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
+              ) : mark === "partial" ? (
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-400" />
               ) : (
                 <XCircle className="h-5 w-5 shrink-0 text-rose-400" />
               )}
               <span
                 className={`text-sm font-bold ${
-                  mark === "correct" ? "text-emerald-300" : "text-rose-300"
+                  mark === "correct" ? "text-emerald-300" : mark === "partial" ? "text-amber-200" : "text-rose-300"
                 }`}
               >
                 {mark === "correct"
                   ? `Full marks [${q.marks}/${q.marks}]`
-                  : `0/${q.marks} — see mark scheme`}
+                  : mark === "partial"
+                    ? `${scores[index]}/${q.marks} — correct value, check the unit`
+                    : `0/${q.marks} — see mark scheme`}
               </span>
               {mark !== "correct" && (
                 <span className="ml-auto font-mono text-xs text-ink-muted">

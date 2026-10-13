@@ -1,5 +1,6 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
 import { format3SF } from "../../../lib/format.ts";
+import { seededPick } from "../../../lib/seeded-choice.ts";
 
 export type PathKind = "resistor" | "ammeter" | "lamp";
 export type TrayType = "resistor_10" | "resistor_20" | "lamp" | "ammeter" | "voltmeter";
@@ -545,23 +546,26 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
   };
 }
 
-export function generateCircuitsExamQuestions(): ExamQuestion[] {
+export function generateCircuitsExamQuestions(seed = 1): ExamQuestion[] {
+  const emf = seededPick(seed, "circuits-c1-emf", [4.5, 6, 7.5]);
+  const resistance = seededPick(seed, "circuits-c1-resistance", [10, 15, 20]);
+  const current = emf / resistance;
   return [
     {
       id: "c1",
       number: 1,
       marks: 2,
       paperRef: "0625/41 · Ohm’s law",
-      prompt: "A 6.0 V cell is connected to a 10 Ω resistor. The switch is closed. Calculate the current.",
-      contextLines: ["E = 6.0 V", "R = 10 Ω"],
+      prompt: `A ${emf.toFixed(1)} V cell is connected to a ${resistance} Ω resistor. The switch is closed. Calculate the current.`,
+      contextLines: [`E = ${emf.toFixed(1)} V`, `R = ${resistance} Ω`],
       kind: "numeric",
-      expected: 0.6,
+      expected: current,
       unit: "A",
       tolerancePct: 2,
       working: {
         equation: "I = V / R",
-        substitution: "6.0 / 10 = 0.60",
-        answer: "0.600 A",
+        substitution: `${emf.toFixed(1)} / ${resistance} = ${current.toFixed(2)}`,
+        answer: `${current.toFixed(3)} A`,
       },
       misconception: "Current is not 6 × 10. Rearrange V = IR to I = V/R.",
     },
