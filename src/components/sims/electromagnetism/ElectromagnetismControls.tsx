@@ -1,5 +1,5 @@
 import { Hand, RotateCcw, Sliders } from "lucide-react";
-import { format3SF } from "@/lib/format";
+import { SimulationSlider } from "@/components/ui/SimulationControls";
 import {
   ELECTROMAGNETISM_PRESETS,
   type CalculatedElectromagnetism,
@@ -11,6 +11,7 @@ interface Props {
   state: ElectromagnetismState;
   calculated: CalculatedElectromagnetism;
   onChangeCurrentA: (v: number) => void;
+  onToggleCurrentDirection: () => void;
   onChangeBFieldT: (v: number) => void;
   onChangeLengthM: (v: number) => void;
   onToggleBDir: () => void;
@@ -21,6 +22,7 @@ interface Props {
 export function ElectromagnetismControls({
   state,
   onChangeCurrentA,
+  onToggleCurrentDirection,
   onChangeBFieldT,
   onChangeLengthM,
   onToggleBDir,
@@ -43,18 +45,17 @@ export function ElectromagnetismControls({
         </button>
       </div>
 
-      <SliderRow
+      <SimulationSlider
         label="Current"
         symbol="I"
         value={state.currentA}
-        min={-10}
+        min={0}
         max={10}
         step={0.1}
         unit="A"
         onChange={onChangeCurrentA}
-        bipolar
       />
-      <SliderRow
+      <SimulationSlider
         label="Magnetic flux density"
         symbol="B"
         value={state.bFieldT}
@@ -64,7 +65,7 @@ export function ElectromagnetismControls({
         unit="T"
         onChange={onChangeBFieldT}
       />
-      <SliderRow
+      <SimulationSlider
         label="Length in the field"
         symbol="L"
         value={state.lengthM}
@@ -74,6 +75,16 @@ export function ElectromagnetismControls({
         unit="m"
         onChange={onChangeLengthM}
       />
+
+      <button
+        type="button"
+        onClick={onToggleCurrentDirection}
+        aria-label="Reverse conventional current"
+        aria-pressed={state.currentDirection === "reverse"}
+        className="rounded-lg border border-border-subtle bg-inset px-3 py-2 text-left text-xs font-semibold text-ink-muted hover:text-accent"
+      >
+        Conventional current: {state.currentDirection === "forward" ? "forward → / out of page ⊙" : "reverse ← / into page ×"} · tap to reverse
+      </button>
 
       <button
         type="button"
@@ -128,53 +139,3 @@ function Hint({ color, title, sub }: { color: string; title: string; sub: string
   );
 }
 
-function SliderRow({
-  label,
-  symbol,
-  value,
-  min,
-  max,
-  step,
-  unit,
-  onChange,
-  bipolar,
-}: {
-  label: string;
-  symbol: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  onChange: (v: number) => void;
-  bipolar?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-xs text-ink-muted">
-          <span className="font-bold text-accent">{symbol}</span> — {label}
-        </span>
-        <span className="font-mono text-xs font-bold tabular-nums text-amber-300">
-          {format3SF(value)} {unit}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="h-1.5 w-full accent-amber-400"
-      />
-      {bipolar && (
-        <div className="flex justify-between font-mono text-[9px] text-ink-faint">
-          <span>{min} A</span>
-          <span>0</span>
-          <span>+{max} A</span>
-        </div>
-      )}
-    </div>
-  );
-}

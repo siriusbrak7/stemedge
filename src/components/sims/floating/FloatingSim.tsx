@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { ExamPlayer } from "@/components/ExamPlayer";
 import { SimHeader } from "@/components/SimHeader";
+import { SimulationSlider as Slider } from "@/components/ui/SimulationControls";
 import { format3SF } from "@/lib/format";
 import {
   computeFloating,
+  evaluateFloatingTasks,
+  FLOATING_PRESETS,
+  FLOATING_TASKS,
   generateFloatingExamQuestions,
   getInitialFloatingState,
   type FloatingState,
@@ -17,11 +21,25 @@ interface Props {
 export function FloatingSim({ onBackToHome }: Props) {
   const [mode, setMode] = useState<"explore" | "exam">("explore");
   const [state, setState] = useState<FloatingState>(getInitialFloatingState);
+  const [taskId, setTaskId] = useState(1);
   const d = computeFloating(state);
+  const taskResults = evaluateFloatingTasks(state, d);
+  const currentTask = FLOATING_TASKS.find((task) => task.id === taskId) ?? FLOATING_TASKS[0];
+  const clipId = useId();
   const waterY = 150;
-  const blockH = 70;
-  const submerged = d.fraction * blockH;
-  const top = waterY - (blockH - submerged);
+  const blockH = Math.cbrt(state.volumeM3 / 0.002) * 70;
+  const blockX = (560 - blockH) / 2;
+  const top = d.sinks
+    ? 252 - blockH
+    : d.suspends
+      ? waterY + 55 - blockH / 2
+      : waterY - blockH * (1 - d.fraction);
+  const submergedTop = Math.max(waterY, top);
+  const submergedHeight = Math.max(0, Math.min(top + blockH, 252) - submergedTop);
+  const forceScale = Math.max(d.weight, d.upthrust, d.normalReaction, 1);
+  const weightArrow = Math.max(8, (d.weight / forceScale) * 44);
+  const upthrustArrow = Math.max(8, (d.upthrust / forceScale) * 44);
+  const normalArrow = Math.max(0, (d.normalReaction / forceScale) * 44);
 
   if (mode === "exam") {
     return (
@@ -40,16 +58,38 @@ export function FloatingSim({ onBackToHome }: Props) {
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-[3fr_2fr]">
         <div className="overflow-hidden rounded-xl border border-border-faint bg-inset">
           <svg viewBox="0 0 560 280" className="h-auto w-full">
+            <defs>
+              <clipPath id={clipId}>
+                <rect x={blockX} y={top} width={blockH} height={blockH} rx="4" />
+              </clipPath>
+              <marker id={`${clipId}-arrow`} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                <path d="M0 0 L7 3.5 L0 7 Z" fill="#FBBF24" />
+              </marker>
+              <marker id={`${clipId}-blue-arrow`} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                <path d="M0 0 L7 3.5 L0 7 Z" fill="#38BDF8" />
+              </marker>
+            </defs>
             <rect width="560" height="280" fill="#0A0C10" />
             <rect x="80" y={waterY} width="400" height="110" fill="#0C4A6E" opacity="0.55" />
             <line x1="80" y1={waterY} x2="480" y2={waterY} stroke="#38BDF8" strokeWidth="2" />
             <rect x="80" y="150" width="8" height="110" fill="#1E293B" />
             <rect x="472" y="150" width="8" height="110" fill="#1E293B" />
             <rect x="80" y="252" width="400" height="8" fill="#1E293B" />
-            <rect x="240" y={top} width="80" height={blockH} rx="4" fill="#1E2433" stroke="#F59E0B" strokeWidth="2" />
-            <text x="280" y={top + 40} textAnchor="middle" fill="#F8FAFC" fontSize="11" fontFamily="monospace">
+            <rect x={blockX} y={top} width={blockH} height={blockH} rx="4" fill="#1E2433" stroke="#F59E0B" strokeWidth="2" className="transition-[y] duration-500" />
+            <rect x={blockX} y={submergedTop} width={blockH} height={submergedHeight} fill="#38BDF8" opacity="0.42" clipPath={`url(#${clipId})`} className="transition-[y,height] duration-500" />
+            <text x="280" y={Math.min(240, top + blockH / 2 + 4)} textAnchor="middle" fill="#F8FAFC" fontSize="11" fontFamily="monospace">
               {format3SF(state.objectDensity)} kg/m³
             </text>
+            <line x1="205" y1={top + blockH / 2} x2="205" y2={top + blockH / 2 + weightArrow} stroke="#FBBF24" strokeWidth="2.2" markerEnd={`url(#${clipId}-arrow)`} />
+            <text x="190" y={top + blockH / 2 + weightArrow + 14} fill="#FBBF24" fontSize="10" fontFamily="monospace">W</text>
+            <line x1="355" y1={top + blockH / 2} x2="355" y2={top + blockH / 2 - upthrustArrow} stroke="#38BDF8" strokeWidth="2.2" markerEnd={`url(#${clipId}-blue-arrow)`} />
+            <text x="361" y={top + blockH / 2 - upthrustArrow - 3} fill="#38BDF8" fontSize="10" fontFamily="monospace">U</text>
+            {d.sinks && (
+              <g>
+                <line x1="330" y1="248" x2="330" y2={248 - normalArrow} stroke="#34D399" strokeWidth="2.2" markerEnd={`url(#${clipId}-blue-arrow)`} />
+                <text x="337" y={248 - normalArrow} fill="#34D399" fontSize="9" fontFamily="monospace">N</text>
+              </g>
+            )}
             <text x="20" y="28" fill="#94A3B8" fontSize="11" fontFamily="monospace">
               {status} · {format3SF(d.fraction * 100)}% submerged
             </text>
@@ -59,14 +99,23 @@ export function FloatingSim({ onBackToHome }: Props) {
           </svg>
         </div>
         <div className="flex flex-col gap-3">
-          <div className="rounded-xl border border-accent/30 bg-accent/10 p-3">
-            <p className="font-mono text-[10px] uppercase text-ink-faint">Weight vs upthrust</p>
-            <p className="mt-1 font-mono text-sm text-ink">
-              W = {format3SF(d.weight)} N · U = {format3SF(d.upthrust)} N
-            </p>
-          </div>
           <div className="rounded-xl border border-border-subtle bg-surface p-3">
-            <Slider label="Object density" value={state.objectDensity} min={200} max={2000} step={10} unit="kg/m³" onChange={(objectDensity) => setState((s) => ({ ...s, objectDensity }))} />
+            <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+              <FloatingReadout label="Density" value={`${format3SF(state.objectDensity)} kg/m³`} />
+              <FloatingReadout label="Submerged" value={`${format3SF(d.fraction * 100)}%`} />
+              <FloatingReadout label="Weight W" value={`${format3SF(d.weight)} N`} />
+              <FloatingReadout label="Upthrust U" value={`${format3SF(d.upthrust)} N`} />
+              <FloatingReadout label="Normal reaction" value={`${format3SF(d.normalReaction)} N`} />
+              <FloatingReadout label="Net force" value={`${format3SF(d.netForce)} N`} />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {FLOATING_PRESETS.map((preset) => (
+                <button key={preset.name} type="button" onClick={() => setState((s) => ({ ...s, objectDensity: preset.objectDensity, liquidDensity: preset.liquidDensity }))} className="rounded-md border border-border-subtle px-2 py-1.5 text-[11px] font-semibold text-ink-muted hover:border-accent/50 hover:text-accent">
+                  {preset.name}
+                </button>
+              ))}
+            </div>
+            <Slider label="Object density" value={state.objectDensity} min={200} max={8000} step={10} unit="kg/m³" onChange={(objectDensity) => setState((s) => ({ ...s, objectDensity }))} />
             <Slider label="Liquid density" value={state.liquidDensity} min={600} max={1400} step={10} unit="kg/m³" onChange={(liquidDensity) => setState((s) => ({ ...s, liquidDensity }))} />
             <Slider
               label="Volume"
@@ -88,20 +137,27 @@ export function FloatingSim({ onBackToHome }: Props) {
           </div>
         </div>
       </div>
+      <div className="rounded-xl border border-border-subtle bg-surface p-3">
+        <div className="mb-2 flex flex-wrap gap-2">
+          {FLOATING_TASKS.map((task) => (
+            <button key={task.id} type="button" onClick={() => setTaskId(task.id)} className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${taskId === task.id ? "bg-accent text-accent-fg" : "border border-border-subtle text-ink-muted"}`}>
+              {taskResults[task.id] ? "✓" : "○"} Task {task.id}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm font-medium text-ink">{currentTask.title}</p>
+        <p className="mt-1 text-xs text-ink-muted">{currentTask.prompt}</p>
+      </div>
     </div>
   );
 }
 
-function Slider({
-  label, value, min, max, step, unit, onChange,
-}: { label: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
+function FloatingReadout({ label, value }: { label: string; value: string }) {
   return (
-    <label className="mt-2 flex flex-col gap-1">
-      <span className="flex justify-between font-mono text-xs text-ink-muted">
-        {label}
-        <span className="font-bold text-amber-300">{format3SF(value)} {unit}</span>
-      </span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} className="h-1.5 w-full accent-amber-400" />
-    </label>
+    <div className="rounded-lg border border-border-faint bg-inset p-2">
+      <p className="text-[10px] text-ink-faint">{label}</p>
+      <p className="mt-1 font-bold tabular-nums text-accent">{value}</p>
+    </div>
   );
 }
+

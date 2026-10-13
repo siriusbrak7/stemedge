@@ -191,6 +191,76 @@ function sectionResistance(section: Section): number {
   return 1 / recip;
 }
 
+export const LAMP_TEMP_COEFFICIENT = 2;
+
+export function lampResistanceAtCurrent(baseResistance: number, currentA: number): number {
+  return baseResistance * (1 + LAMP_TEMP_COEFFICIENT * currentA * currentA);
+}
+
+function resistanceAtCurrent(component: PathComponent, currentA: number): number {
+  return component.kind === "lamp"
+    ? lampResistanceAtCurrent(component.value, currentA)
+    : resistanceOf(component);
+}
+
+function branchResistanceAtCurrent(branch: PathComponent[], currentA: number): number {
+  if (branch.length === 0) return Infinity;
+  return branch.reduce((sum, component) => sum + resistanceAtCurrent(component, currentA), 0);
+}
+
+function parallelBranchCurrents(section: Extract<Section, { type: "parallel" }>, totalCurrent: number) {
+  let currents: [number, number] = [totalCurrent / 2, totalCurrent / 2];
+  for (let iteration = 0; iteration < 24; iteration += 1) {
+    const resistances = section.branches.map((branch, index) =>
+      branchResistanceAtCurrent(branch, currents[index]),
+    ) as [number, number];
+    const conductances = resistances.map((resistance) =>
+      Number.isFinite(resistance) && resistance > 0 ? 1 / resistance : resistance === 0 ? Infinity : 0,
+    ) as [number, number];
+    const next: [number, number] =
+      conductances[0] === Infinity
+        ? [totalCurrent, 0]
+        : conductances[1] === Infinity
+          ? [0, totalCurrent]
+          : conductances[0] + conductances[1] > 0
+            ? [
+                totalCurrent * (conductances[0] / (conductances[0] + conductances[1])),
+                totalCurrent * (conductances[1] / (conductances[0] + conductances[1])),
+              ]
+            : [0, 0];
+    const settled: [number, number] = [
+      currents[0] * 0.5 + next[0] * 0.5,
+      currents[1] * 0.5 + next[1] * 0.5,
+    ];
+    if (Math.abs(settled[0] - currents[0]) < 1e-9) {
+      currents = next;
+      break;
+    }
+    currents = settled;
+  }
+  return currents;
+}
+
+function sectionResistanceAtCurrent(section: Section, currentA: number): number {
+  if (section.type === "series") return resistanceAtCurrent(section.component, currentA);
+  const branchCurrents = parallelBranchCurrents(section, currentA);
+  const branchResistances = section.branches.map((branch, index) =>
+    branchResistanceAtCurrent(branch, branchCurrents[index]),
+  );
+  const conductance = branchResistances.reduce(
+    (sum, resistance) => sum + (Number.isFinite(resistance) && resistance > 0 ? 1 / resistance : 0),
+    0,
+  );
+  return conductance > 0 ? 1 / conductance : Infinity;
+}
+
+function loadResistanceAtCurrent(state: CircuitState, currentA: number): number {
+  return state.sections.reduce(
+    (sum, section) => sum + sectionResistanceAtCurrent(section, currentA),
+    0,
+  );
+}
+
 function hasLoad(state: CircuitState): boolean {
   return state.sections.some((sec) => {
     if (sec.type === "series") return isLoad(sec.component);
@@ -244,7 +314,7 @@ function hasZeroResistanceParallelBranch(state: CircuitState): boolean {
 export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
   const empty = state.sections.length === 0;
   const loadsPresent = hasLoad(state);
-  const rLoad = loadResistanceOf(state);
+  let rLoad = loadResistanceOf(state);
   const steps: string[] = [];
 
   if (!empty) {
@@ -268,8 +338,8 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
   const parallelShort = hasZeroResistanceParallelBranch(state);
   const isShort = state.switchClosed && !empty && (!loadsPresent || parallelShort);
   const rInternal = Math.max(0, state.internalR);
-  const rTotalIfClosed = (Number.isFinite(rLoad) ? rLoad : 0) + rInternal;
-  const isClosed = state.switchClosed && loadsPresent && Number.isFinite(rLoad) && rLoad > 0.001;
+  let rTotalIfClosed = (Number.isFinite(rLoad) ? rLoad : 0) + rInternal;
+  const isClosed = state.switchClosed && loadsPresent && Number.isFinite(rLoad) && rLoad > 0.001 && !parallelShort;
 
   let totalCurrent = 0;
   if (switchOpen) {
@@ -278,6 +348,19 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
     totalCurrent = rInternal > 0.001 ? state.cellEmf / rInternal : Infinity;
   } else if (isClosed) {
     totalCurrent = state.cellEmf / rTotalIfClosed;
+    for (let iteration = 0; iteration < 48; iteration += 1) {
+      const nextResistance = loadResistanceAtCurrent(state, totalCurrent);
+      const nextCurrent = state.cellEmf / (nextResistance + rInternal);
+      if (Math.abs(nextCurrent - totalCurrent) < 1e-10) {
+        totalCurrent = nextCurrent;
+        rLoad = nextResistance;
+        break;
+      }
+      totalCurrent = totalCurrent * 0.5 + nextCurrent * 0.5;
+      rLoad = nextResistance;
+    }
+    rLoad = loadResistanceAtCurrent(state, totalCurrent);
+    rTotalIfClosed = rLoad + rInternal;
   }
 
   const terminalV = switchOpen
@@ -312,22 +395,23 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
         const i = totalCurrent;
         componentCurrent[sec.component.id] = i;
         if (isLoad(sec.component)) {
-          const v = i * sec.component.value;
+          const v = i * resistanceAtCurrent(sec.component, i);
           voltagesSum += v;
           resistorCurrents[sec.component.id] = { current: i, voltage: v, power: i * v };
         }
       } else {
-        const rSec = sectionResistance(sec);
+        const branchIs = parallelBranchCurrents(sec, totalCurrent);
+        const rSec = sectionResistanceAtCurrent(sec, totalCurrent);
         const vSec = totalCurrent * rSec;
         voltagesSum += Number.isFinite(vSec) ? vSec : 0;
         sec.branches.forEach((branch, idx) => {
-          const rB = branchResistance(branch);
-          const iB = Number.isFinite(rB) && rB > 0 ? vSec / rB : rB === 0 ? totalCurrent : 0;
+          const iB = branchIs[idx];
           branchCurrents[`${sec.id}:${idx}`] = iB;
           for (const c of branch) {
             componentCurrent[c.id] = iB;
             if (isLoad(c)) {
-              resistorCurrents[c.id] = { current: iB, voltage: iB * c.value, power: iB * iB * c.value };
+              const voltage = iB * resistanceAtCurrent(c, iB);
+              resistorCurrents[c.id] = { current: iB, voltage, power: iB * voltage };
             }
           }
         });

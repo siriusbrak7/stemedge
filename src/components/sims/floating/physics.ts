@@ -1,11 +1,25 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
-import { G_N_PER_KG } from "@/lib/format";
+import { G_N_PER_KG } from "../../../lib/format.ts";
 
 export interface FloatingState {
   objectDensity: number;
   liquidDensity: number;
   volumeM3: number;
 }
+
+export const FLOATING_PRESETS = [
+  { name: "Wood · water", objectDensity: 700, liquidDensity: 1000 },
+  { name: "Ice · water", objectDensity: 917, liquidDensity: 1000 },
+  { name: "Steel · water", objectDensity: 7850, liquidDensity: 1000 },
+  { name: "Wood · oil", objectDensity: 700, liquidDensity: 850 },
+];
+
+export const FLOATING_TASKS = [
+  { id: 1, title: "Floating", prompt: "Choose an object less dense than its liquid. Compare its weight with the upthrust." },
+  { id: 2, title: "Fraction submerged", prompt: "For a floating object, set the object density to half the liquid density." },
+  { id: 3, title: "Suspended", prompt: "Set the object and liquid to the same density so the object is neutrally buoyant." },
+  { id: 4, title: "Sinking", prompt: "Choose an object denser than its liquid and identify the normal reaction at the tank bottom." },
+];
 
 export function getInitialFloatingState(): FloatingState {
   return { objectDensity: 700, liquidDensity: 1000, volumeM3: 0.002 };
@@ -19,7 +33,21 @@ export function computeFloating(s: FloatingState) {
   const upthrust = s.liquidDensity * displaced * G_N_PER_KG;
   const floats = s.objectDensity < s.liquidDensity - 1;
   const suspends = !floats && !sinks;
-  return { weight, upthrust, fraction, displaced, floats, sinks, suspends };
+  const normalReaction = sinks ? Math.max(0, weight - upthrust) : 0;
+  const netForce = weight - upthrust - normalReaction;
+  return { weight, upthrust, fraction, displaced, floats, sinks, suspends, normalReaction, netForce };
+}
+
+export function evaluateFloatingTasks(
+  state: FloatingState,
+  result: ReturnType<typeof computeFloating>,
+): Record<number, boolean> {
+  return {
+    1: result.floats && Math.abs(result.weight - result.upthrust) < 0.05,
+    2: result.floats && Math.abs(result.fraction - 0.5) < 0.03,
+    3: result.suspends,
+    4: result.sinks && result.normalReaction > 0,
+  };
 }
 
 export function generateFloatingExamQuestions(): ExamQuestion[] {

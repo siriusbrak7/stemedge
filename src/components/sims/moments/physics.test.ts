@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { computeMoments, type MomentsState } from "./physics.ts";
+import { computeMoments, mysteryPreset, type MomentsState } from "./physics.ts";
 
 test("a lone load is not in equilibrium even when its moment is below the old threshold", () => {
   const state: MomentsState = {
@@ -23,4 +23,8 @@ test("relative moment tolerance recognizes the 2 kg and 3 kg balance", () => {
     ],
   };
   assert.equal(computeMoments(state).balanced, true);
+});
+
+test("mystery preset starts visibly out of equilibrium", () => {
+  assert.equal(computeMoments(mysteryPreset()).balanced, false);
 });

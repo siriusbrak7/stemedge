@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function ElectromagnetismReadouts({ state, calculated }: Props) {
-  const none = Math.abs(state.currentA) < 0.001;
+  const none = state.currentA < 0.001;
   return (
     <div className="flex flex-col gap-2.5 rounded-xl border border-border-subtle bg-surface p-3">
       <div className="flex items-center gap-2 border-b border-border-faint pb-1">
@@ -28,9 +28,9 @@ export function ElectromagnetismReadouts({ state, calculated }: Props) {
       <Card
         icon={Zap}
         label="Current I"
-        value={format3SF(state.currentA)}
+        value={state.currentDirection === "forward" ? `→ ${format3SF(state.currentA)}` : `← ${format3SF(state.currentA)}`}
         unit="A"
-        accent={state.currentA >= 0 ? "text-amber-300" : "text-blue-300"}
+        accent={state.currentDirection === "forward" ? "text-amber-300" : "text-blue-300"}
       />
       <Card icon={Ruler} label="Length in field L" value={format3SF(state.lengthM)} unit="m" />
       <div className="rounded-lg border border-border-faint bg-canvas-elevated px-2.5 py-1.5">

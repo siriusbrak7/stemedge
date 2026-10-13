@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Lightbulb, Pause, Play, RotateCcw, Zap } from "lucide-react";
 import { ExamPlayer } from "@/components/ExamPlayer";
 import { SimHeader } from "@/components/SimHeader";
+import { SimulationReadout as Readout, SimulationSlider as Slider } from "@/components/ui/SimulationControls";
 import { format3SF } from "@/lib/format";
 import { ForcesCanvas } from "./ForcesCanvas";
 import { ForcesGraphs, type MotionSample } from "./ForcesGraphs";
@@ -29,6 +30,8 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
   const [velocity, setVelocity] = useState(0);
   const [samples, setSamples] = useState<MotionSample[]>([{ t: 0, v: 0, s: 1.2 }]);
   const [hitEnd, setHitEnd] = useState<"min" | "max" | null>(null);
+  const [completedTasks, setCompletedTasks] = useState<Record<number, boolean>>({});
+  const task3Baseline = useRef({ massKg: state.massKg, resultantN: computeForces(state, 0).resultantN });
 
   const timeRef = useRef(0);
   const vRef = useRef(0);
@@ -38,7 +41,7 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
   stateRef.current = state;
 
   const derived = computeForces(state, velocity);
-  const tasksDone = evaluateMotionTasks({
+  const tasksNow = evaluateMotionTasks({
     resultantN: derived.resultantN,
     acceleration: derived.acceleration,
     velocity,
@@ -46,8 +49,25 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
     frictionN: state.frictionN,
     running: state.running,
     timeS: samples[samples.length - 1]?.t ?? 0,
+    task3Baseline: task3Baseline.current,
   });
+  const task1Now = tasksNow[1];
+  const task2Now = tasksNow[2];
+  const task3Now = tasksNow[3];
+  const task4Now = tasksNow[4];
+  const tasksDone = { ...tasksNow, ...completedTasks };
   const currentTask = MOTION_TASKS.find((t) => t.id === taskId) ?? MOTION_TASKS[0];
+
+  useEffect(() => {
+    setCompletedTasks((previous) => {
+      const next = { ...previous };
+      if (task1Now) next[1] = true;
+      if (task2Now) next[2] = true;
+      if (task3Now) next[3] = true;
+      if (task4Now) next[4] = true;
+      return next;
+    });
+  }, [task1Now, task2Now, task3Now, task4Now]);
 
   useEffect(() => {
     let frame = 0;
@@ -107,10 +127,15 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
     setPosition(s0);
     setSamples([{ t: 0, v: v0, s: s0 }]);
     setHitEnd(null);
+    setCompletedTasks({});
     timeRef.current = 0;
     vRef.current = v0;
     sRef.current = s0;
     sampleAcc.current = 0;
+    task3Baseline.current = {
+      massKg: merged.massKg,
+      resultantN: computeForces(merged, v0).resultantN,
+    };
   }
 
   function applyPreset(p: ForcesPreset) {
@@ -181,7 +206,15 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setTaskId(t.id)}
+                  onClick={() => {
+                    if (t.id === 3) {
+                      task3Baseline.current = {
+                        massKg: state.massKg,
+                        resultantN: derived.resultantN,
+                      };
+                    }
+                    setTaskId(t.id);
+                  }}
                   className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
                     selected ? "bg-accent text-accent-fg" : "border border-border-subtle bg-muted-bg text-ink-muted"
                   }`}
@@ -253,7 +286,7 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
             />
             <Readout label="Acceleration" value={`${format3SF(derived.acceleration)} m/s²`} hint="a = F_res / m" />
             <Readout label="Velocity" value={`${format3SF(velocity)} m/s`} hint="gradient of s–t" />
-            <Readout label="Displacement" value={`${format3SF(position)} m`} hint="area under v–t" />
+            <Readout label="Position" value={`${format3SF(position)} m`} hint="track coordinate from the 0 m end" />
           </div>
 
           <div className="rounded-xl border border-border-subtle bg-surface p-3">
@@ -338,64 +371,3 @@ export function ResultantForcesSim({ onBackToHome }: Props) {
   );
 }
 
-function Readout({
-  label,
-  value,
-  hint,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-3 ${
-        highlight ? "border-accent/30 bg-accent/10" : "border-border-subtle bg-surface"
-      }`}
-    >
-      <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{label}</p>
-      <p className="mt-1 font-mono text-lg font-bold tabular-nums text-accent">{value}</p>
-      <p className="mt-0.5 text-[10px] text-ink-faint">{hint}</p>
-    </div>
-  );
-}
-
-function Slider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  unit,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <label className="mt-2 flex flex-col gap-1">
-      <span className="flex justify-between font-mono text-xs text-ink-muted">
-        {label}
-        <span className="font-bold tabular-nums text-amber-300">
-          {format3SF(value)} {unit}
-        </span>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="h-1.5 w-full cursor-pointer accent-amber-400"
-      />
-    </label>
-  );
-}

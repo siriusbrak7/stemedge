@@ -30,8 +30,8 @@ interface LaidSection {
 }
 
 function layout(sections: Section[]): LaidSection[] {
-  const widths = sections.map((s) => (s.type === "parallel" ? 150 : 108));
-  const gap = 16;
+  const widths = sections.map((s) => (s.type === "parallel" ? 120 : 100));
+  const gap = 8;
   const total = widths.reduce((a, b) => a + b, 0) + gap * Math.max(0, sections.length - 1);
   const inner = RIGHT - LEFT;
   let x = LEFT + Math.max(0, (inner - total) / 2);
@@ -181,10 +181,10 @@ export function SchematicCanvas({
 }: Props) {
   const laid = layout(state.sections);
   const live = evaluation.isClosed;
-  const placingPath = selected === "resistor_10" || selected === "resistor_20" || selected === "ammeter" || selected === "lamp";
   const placingV = selected === "voltmeter";
   const flowId = useId();
-  const loopD = `M ${CELL_X} ${TOP} L ${RIGHT} ${TOP} L ${RIGHT} ${BOT} L ${CELL_X} ${BOT}`;
+  const switchX = 200;
+  const loopD = `M ${CELL_X} ${TOP} L ${RIGHT} ${TOP} L ${RIGHT} ${BOT} L ${switchX + 32} ${BOT} M ${switchX - 28} ${BOT} L ${CELL_X} ${BOT}`;
 
   function renderComp(c: PathComponent, x: number, y: number) {
     const i = evaluation.componentCurrent[c.id] ?? 0;
@@ -271,7 +271,6 @@ export function SchematicCanvas({
   }
 
   const trailingX = laid.length ? laid[laid.length - 1].x + laid[laid.length - 1].w + 58 : (LEFT + RIGHT) / 2;
-  const switchX = 200;
   const switchOpen = !state.switchClosed;
 
   return (
@@ -286,14 +285,12 @@ export function SchematicCanvas({
         <span className="font-mono text-[11px] text-ink-faint">
           {placingV
             ? "Clip the voltmeter across the cell or a load"
-            : placingPath
-              ? "Tap a dashed branch slot, or just tap a part in the tray to add it"
-              : "Tap a part in the tray to add it to the loop"}
+            : "Tap a tray part to add it, or a dashed branch slot to fill it"}
         </span>
       </div>
 
       <div className="w-full overflow-x-auto">
-        <svg viewBox={`0 0 ${VW} ${VH}`} className="h-auto w-full min-w-[560px]">
+        <svg viewBox={`0 0 ${VW} ${VH}`} className="h-auto w-full">
           <defs>
             <pattern id={`${flowId}-grid`} width="20" height="20" patternUnits="userSpaceOnUse">
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#171C2B" strokeWidth="0.8" />
@@ -435,8 +432,8 @@ export function SchematicCanvas({
               <EmptySlot
                 x={trailingX}
                 y={TOP}
-                label={state.sections.length === 0 ? "tap to add 10 Ω" : placingPath ? "place here" : "tap tray to add"}
-                active={placingPath}
+                label={state.sections.length === 0 ? "tap to add 10 Ω" : placingV ? "clip V to a load" : "tap tray to add"}
+                active={placingV}
               />
             </g>
           )}

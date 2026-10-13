@@ -4,6 +4,7 @@ import {
   componentFromTray,
   evaluateCircuit,
   getInitialCircuitState,
+  lampResistanceAtCurrent,
   resistorValueLabel,
   type CircuitState,
 } from "./physics.ts";
@@ -38,4 +39,19 @@ test("an ammeter in parallel with a load is a short circuit", () => {
     evaluation.coach,
     "An ammeter in parallel is a short circuit; ammeters go in series.",
   );
+});
+
+test("lamp resistance rises with current and the circuit solver converges", () => {
+  assert.ok(lampResistanceAtCurrent(12, 1) > lampResistanceAtCurrent(12, 0));
+  const lamp = componentFromTray("lamp");
+  const state: CircuitState = {
+    ...getInitialCircuitState(),
+    sections: [{ id: "lamp", type: "series", component: lamp }],
+  };
+  const evaluation = evaluateCircuit(state);
+  const reading = evaluation.resistorCurrents[lamp.id];
+  assert.ok(Number.isFinite(evaluation.totalCurrent));
+  assert.ok(reading.voltage / reading.current > lamp.value);
+  assert.ok(Math.abs(reading.voltage - state.cellEmf) < 1e-6);
+  assert.equal(Number.isNaN(evaluation.powerW), false);
 });

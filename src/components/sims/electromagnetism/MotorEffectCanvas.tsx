@@ -18,7 +18,8 @@ interface Props {
 export function MotorEffectCanvas({ state, calculated }: Props) {
   const { currentA, bFieldT, lengthM, bIntoPage } = state;
   const { forceMagnitudeN, directionSign, directionLabel } = calculated;
-  const noForce = Math.abs(currentA) < 0.001 || forceMagnitudeN < 1e-6;
+  const currentForward = state.currentDirection === "forward";
+  const noForce = currentA < 0.001 || forceMagnitudeN < 1e-6;
   const deflection = Math.min((forceMagnitudeN / MAX_F) * MAX_DEF, MAX_DEF);
   const wireY = WIRE_Y - directionSign * deflection;
   const fieldHalf = 70 + (lengthM / 2) * 90;
@@ -117,7 +118,7 @@ export function MotorEffectCanvas({ state, calculated }: Props) {
         <line x1={28} y1={wireY} x2={VW - 28} y2={wireY} stroke="#B45309" strokeWidth="4" strokeLinecap="round" />
         <line x1={left} y1={wireY} x2={right} y2={wireY} stroke="#F59E0B" strokeWidth="6" strokeLinecap="round" />
 
-        {currentA > 0.05 &&
+        {currentA > 0.05 && currentForward &&
           [170, 260, 350, 440].map((x) => (
             <polygon
               key={x}
@@ -125,7 +126,7 @@ export function MotorEffectCanvas({ state, calculated }: Props) {
               fill="#FCD34D"
             />
           ))}
-        {currentA < -0.05 &&
+        {currentA > 0.05 && !currentForward &&
           [440, 350, 260, 170].map((x) => (
             <polygon
               key={x}
@@ -138,13 +139,13 @@ export function MotorEffectCanvas({ state, calculated }: Props) {
         <rect x={VW - 34} y={wireY - 14} width="16" height="28" rx="4" fill="#1E2433" stroke="#475569" />
 
         <text
-          x={currentA >= 0 ? VW - 96 : 48}
+          x={currentForward ? VW - 96 : 48}
           y={wireY - 14}
-          fill={currentA >= 0 ? "#FCD34D" : "#93C5FD"}
+          fill={currentForward ? "#FCD34D" : "#93C5FD"}
           fontSize="11"
           fontFamily="monospace"
         >
-          {currentA >= 0 ? "I →" : "← I"} {format3SF(currentA)} A
+          {currentForward ? "I →" : "← I"} {format3SF(currentA)} A
         </text>
 
         <text

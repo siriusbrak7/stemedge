@@ -164,7 +164,7 @@ export function mysteryPreset(): MomentsState {
     includeRule: false,
     loads: [
       { id: "known", massKg: 2, posM: 0.2 },
-      { id: "mystery", massKg: 1.5, posM: 0.9, hidden: true },
+      { id: "mystery", massKg: 1.5, posM: 0.85, hidden: true },
     ],
   };
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, Lightbulb, RotateCcw } from "lucide-react";
 import { ExamPlayer } from "@/components/ExamPlayer";
 import { SimHeader } from "@/components/SimHeader";
+import { SimulationSlider as Slider } from "@/components/ui/SimulationControls";
 import { format3SF, isWithinTolerance } from "@/lib/format";
 import { AngleForceCanvas } from "./AngleForceCanvas";
 import { MetreRuleCanvas } from "./MetreRuleCanvas";
@@ -240,7 +241,7 @@ export function MomentsSim({ onBackToHome }: Props) {
                           <td className="px-3 py-1.5 tabular-nums text-ink-muted">
                             {mysteryRow ? "?" : format3SF(t.weightN)}
                           </td>
-                          <td className="px-3 py-1.5 tabular-nums text-ink-muted">{format3SF(t.armM)}</td>
+                          <td className="px-3 py-1.5 tabular-nums text-ink-muted">{mysteryRow && !mysterySolved ? "?" : format3SF(t.armM)}</td>
                           <td className="px-3 py-1.5 tabular-nums text-accent">
                             {mysteryRow ? "?" : format3SF(t.momentNm)}
                           </td>
@@ -262,14 +263,22 @@ export function MomentsSim({ onBackToHome }: Props) {
                 <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
                   Principle of moments
                 </p>
-                <p className="mt-1 font-mono text-sm text-ink">{derived.formulaLine}</p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Mini label="Σ ACW" value={`${format3SF(derived.acw)} N m`} />
-                  <Mini label="Σ CW" value={`${format3SF(derived.cw)} N m`} />
-                </div>
-                <p className="mt-2 font-mono text-xs text-ink-muted">
-                  net (CW − ACW) = {format3SF(derived.net)} N m
+                <p className="mt-1 font-mono text-sm text-ink">
+                  {hidden && !mysterySolved
+                    ? "Find the unknown moment using m × g × d from the pivot."
+                    : derived.formulaLine}
                 </p>
+                {(!hidden || mysterySolved) && (
+                  <>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Mini label="Σ ACW" value={`${format3SF(derived.acw)} N m`} />
+                      <Mini label="Σ CW" value={`${format3SF(derived.cw)} N m`} />
+                    </div>
+                    <p className="mt-2 font-mono text-xs text-ink-muted">
+                      net (CW − ACW) = {format3SF(derived.net)} N m
+                    </p>
+                  </>
+                )}
               </div>
 
               <div className="rounded-xl border border-border-subtle bg-surface p-3">
@@ -401,40 +410,3 @@ function Mini({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Slider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  unit,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <label className="mt-2 flex flex-col gap-1">
-      <span className="flex justify-between font-mono text-xs text-ink-muted">
-        {label}
-        <span className="font-bold tabular-nums text-amber-300">
-          {format3SF(value)} {unit}
-        </span>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="h-1.5 w-full cursor-pointer accent-amber-400"
-      />
-    </label>
-  );
-}

@@ -11,6 +11,14 @@ interface Props {
   evaluation: CircuitEvaluation;
   state: CircuitState;
   samples: VISample[];
+  readings: RecordedReading[];
+  onRecordReading: () => void;
+}
+
+export interface RecordedReading {
+  voltage: number;
+  current: number;
+  resistance: number;
 }
 
 function collectLoads(state: CircuitState): PathComponent[] {
@@ -24,7 +32,7 @@ function collectLoads(state: CircuitState): PathComponent[] {
   return out;
 }
 
-export function CircuitReadouts({ evaluation, state, samples }: Props) {
+export function CircuitReadouts({ evaluation, state, samples, readings, onRecordReading }: Props) {
   const loads = collectLoads(state);
   const badge = (() => {
     switch (evaluation.topology) {
@@ -79,6 +87,34 @@ export function CircuitReadouts({ evaluation, state, samples }: Props) {
             P = IV = {format3SF(evaluation.powerW)} W
           </span>
         )}
+        <div className="mt-3 border-t border-border-faint pt-3">
+          <button
+            type="button"
+            onClick={onRecordReading}
+            disabled={!evaluation.isClosed || !Number.isFinite(evaluation.totalCurrent) || evaluation.totalCurrent <= 0}
+            className="min-h-10 rounded-lg border border-accent/40 px-3 text-xs font-semibold text-accent disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Record reading
+          </button>
+          {readings.length > 0 && (
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-left font-mono text-xs">
+                <thead className="text-[10px] text-ink-faint">
+                  <tr><th className="py-1 pr-2">V / V</th><th className="py-1 pr-2">I / A</th><th className="py-1">R / Ω</th></tr>
+                </thead>
+                <tbody>
+                  {readings.map((reading, index) => (
+                    <tr key={`${index}-${reading.voltage}`} className="border-t border-border-faint text-ink">
+                      <td className="py-1 pr-2">{format3SF(reading.voltage)}</td>
+                      <td className="py-1 pr-2">{format3SF(reading.current)}</td>
+                      <td className="py-1">{format3SF(reading.resistance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="rounded-xl border border-border-subtle bg-surface p-3">
@@ -109,7 +145,9 @@ export function CircuitReadouts({ evaluation, state, samples }: Props) {
                   return (
                     <tr key={r.id} className="border-b border-border-faint text-ink">
                       <td className="py-1.5 pr-2 font-medium">{r.label}</td>
-                      <td className="py-1.5 pr-2 font-mono text-cyan-300">{format3SF(r.value)}</td>
+                      <td className="py-1.5 pr-2 font-mono text-cyan-300">
+                        {format3SF(r.kind === "lamp" && data && data.current > 0 ? data.voltage / data.current : r.value)}
+                      </td>
                       <td className="py-1.5 pr-2 font-mono">{format3SF(data?.current ?? 0)}</td>
                       <td className="py-1.5 pr-2 font-mono font-semibold text-amber-300">
                         {format3SF(data?.voltage ?? 0)}
@@ -136,7 +174,7 @@ export function CircuitReadouts({ evaluation, state, samples }: Props) {
         )}
       </div>
 
-      <VIGraph samples={samples} />
+      <VIGraph samples={samples} state={state} />
 
       <div className="flex flex-col gap-1.5 rounded-xl border border-border-faint bg-muted-bg p-3 text-xs text-ink-muted">
         <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-accent">
@@ -165,29 +203,57 @@ export function CircuitReadouts({ evaluation, state, samples }: Props) {
   );
 }
 
-function VIGraph({ samples }: { samples: VISample[] }) {
+function VIGraph({ samples, state }: { samples: VISample[]; state: CircuitState }) {
   const W = 320;
   const H = 140;
   const pl = 36;
   const pb = 24;
   const pr = 10;
   const pt = 14;
-  const vMax = Math.max(6, ...samples.map((s) => s.v), 1);
-  const iMax = Math.max(0.6, ...samples.map((s) => s.i), 0.1);
+  const loads = collectLoads(state);
+  const resistor = loads.find((load) => load.kind === "resistor");
+  const lamp = loads.find((load) => load.kind === "lamp");
+  const vMax = Math.max(state.cellEmf, ...samples.map((s) => s.v), 1);
+  const iMax = Math.max(0.6, ...samples.map((s) => s.i), vMax / Math.max(1, resistor?.value ?? lamp?.value ?? 1));
   const x = (v: number) => pl + (v / vMax) * (W - pl - pr);
   const y = (i: number) => H - pb - (i / iMax) * (H - pt - pb);
   const pts = samples.map((s) => `${x(s.v).toFixed(1)},${y(s.i).toFixed(1)}`).join(" ");
+  const voltageSamples = Array.from({ length: 25 }, (_, index) => (vMax * index) / 24);
+  const resistorPoints = resistor
+    ? voltageSamples.map((voltage) => `${x(voltage).toFixed(1)},${y(voltage / resistor.value).toFixed(1)}`).join(" ")
+    : "";
+  const lampCurrentAtVoltage = (voltage: number) => {
+    if (!lamp) return 0;
+    let low = 0;
+    let high = Math.max(1, voltage / lamp.value);
+    for (let iteration = 0; iteration < 40; iteration += 1) {
+      const current = (low + high) / 2;
+      const drop = current * lamp.value * (1 + 2 * current * current);
+      if (drop < voltage) low = current;
+      else high = current;
+    }
+    return (low + high) / 2;
+  };
+  const lampPoints = lamp
+    ? voltageSamples.map((voltage) => `${x(voltage).toFixed(1)},${y(lampCurrentAtVoltage(voltage)).toFixed(1)}`).join(" ")
+    : "";
 
   return (
     <div className="rounded-xl border border-border-subtle bg-surface p-3">
       <p className="font-mono text-xs font-bold uppercase tracking-widest text-accent">V–I graph (Ohm’s law)</p>
       <p className="mt-0.5 text-[10px] text-ink-faint">
-        Drag the cell e.m.f. A metallic resistor is a straight line through the origin.
+        Resistor: straight line · lamp: curved I–V response
       </p>
+      <div className="mt-1 flex gap-3 font-mono text-[10px]">
+        {resistor && <span className="text-cyan-300">━ resistor</span>}
+        {lamp && <span className="text-violet-300">━ lamp</span>}
+      </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 h-auto w-full">
         <rect width={W} height={H} fill="#0E1017" rx="8" />
         <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#334155" />
         <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#334155" />
+        {resistorPoints && <polyline fill="none" stroke="#22D3EE" strokeWidth="1.8" points={resistorPoints} />}
+        {lampPoints && <polyline fill="none" stroke="#A78BFA" strokeWidth="2" points={lampPoints} />}
         {pts && <polyline fill="none" stroke="#F59E0B" strokeWidth="2" points={pts} />}
         {samples.map((s, idx) => (
           <circle key={`${s.v}-${idx}`} cx={x(s.v)} cy={y(s.i)} r="2.4" fill="#FBBF24" />

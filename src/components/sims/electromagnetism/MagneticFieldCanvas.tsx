@@ -14,9 +14,9 @@ interface Props {
 
 export function MagneticFieldCanvas({ state }: Props) {
   const { currentA } = state;
-  const none = Math.abs(currentA) < 0.001;
-  const out = currentA > 0;
-  const opacity = Math.min(Math.abs(currentA) / 10, 1);
+  const none = currentA < 0.001;
+  const out = state.currentDirection === "forward";
+  const opacity = Math.min(currentA / 10, 1);
   const stroke = out ? "#60A5FA" : "#F59E0B";
 
   const compasses = [0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
@@ -88,8 +88,8 @@ export function MagneticFieldCanvas({ state }: Props) {
           {none
             ? "Wire (I = 0)"
             : out
-              ? `I out of page ⊙  ${format3SF(Math.abs(currentA))} A`
-              : `I into page ⊗  ${format3SF(Math.abs(currentA))} A`}
+              ? `I out of page ⊙  ${format3SF(currentA)} A`
+              : `I into page ⊗  ${format3SF(currentA)} A`}
         </text>
 
         <rect x={16} y={VH - 62} width={300} height={46} rx="8" fill="#0E1119" stroke="#1F2432" />

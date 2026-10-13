@@ -4,10 +4,23 @@ export interface RefractionState {
   n2: number;
   incidenceDeg: number;
   denserToRarer: boolean;
+  material: "water" | "glass" | "diamond" | "custom";
 }
 
+export const REFRACTION_PRESETS = [
+  { name: "Water", n: 1.33, material: "water" as const },
+  { name: "Glass", n: 1.5, material: "glass" as const },
+  { name: "Diamond", n: 2.42, material: "diamond" as const },
+];
+
+export const REFRACTION_TASKS = [
+  { id: 1, title: "Towards the normal", prompt: "Set Air → glass. Use an incidence angle above 0°. The ray should bend towards the normal." },
+  { id: 2, title: "Away from the normal", prompt: "Set Glass → air below the critical angle. The ray should bend away from the normal." },
+  { id: 3, title: "Total internal reflection", prompt: "Set Glass → air and increase the incidence angle above the critical angle." },
+];
+
 export function getInitialRefractionState(): RefractionState {
-  return { n2: 1.5, incidenceDeg: 35, denserToRarer: false };
+  return { n2: 1.5, incidenceDeg: 35, denserToRarer: false, material: "glass" };
 }
 
 export function computeRefraction(s: RefractionState) {
@@ -23,6 +36,7 @@ export function computeRefraction(s: RefractionState) {
     const arg = product / nTo;
     if (arg <= 1) rDeg = (Math.asin(arg) * 180) / Math.PI;
   }
+  const sinR = rDeg === null ? null : Math.sin((rDeg * Math.PI) / 180);
   return {
     nFrom,
     nTo,
@@ -30,7 +44,21 @@ export function computeRefraction(s: RefractionState) {
     tir,
     rDeg,
     sinI: Math.sin(i),
+    sinR,
+    observedRatio: sinR === null || sinR === 0 ? null : Math.sin(i) / sinR,
     n: s.n2,
+  };
+}
+
+export function evaluateRefractionTasks(
+  state: RefractionState,
+  result: ReturnType<typeof computeRefraction>,
+): Record<number, boolean> {
+  const refracted = result.rDeg !== null;
+  return {
+    1: !state.denserToRarer && refracted && result.rDeg! < state.incidenceDeg - 0.5,
+    2: state.denserToRarer && refracted && result.rDeg! > state.incidenceDeg + 0.5,
+    3: state.denserToRarer && result.tir,
   };
 }
 

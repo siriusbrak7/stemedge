@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExamPlayer } from "@/components/ExamPlayer";
 import { SimHeader } from "@/components/SimHeader";
-import { CircuitReadouts, type VISample } from "./CircuitReadouts";
+import { CircuitReadouts, type RecordedReading, type VISample } from "./CircuitReadouts";
 import { ComponentTray } from "./ComponentTray";
 import { SchematicCanvas } from "./SchematicCanvas";
 import { TaskHeader } from "./TaskHeader";
@@ -39,6 +39,8 @@ export function CircuitsSim({ onBackToHome }: Props) {
   const [state, setState] = useState<CircuitState>(getInitialCircuitState);
   const [selected, setSelected] = useState<TrayType | null>(null);
   const [samples, setSamples] = useState<VISample[]>([]);
+  const [readings, setReadings] = useState<RecordedReading[]>([]);
+  const [placementMessage, setPlacementMessage] = useState("");
   const serial = useRef(1);
   const evaluation = useMemo(() => evaluateCircuit(state), [state]);
   const currentTask = GUIDED_TASKS.find((t) => t.id === taskId) ?? GUIDED_TASKS[0];
@@ -70,6 +72,7 @@ export function CircuitsSim({ onBackToHome }: Props) {
   }
 
   function placeComponent(comp: PathComponent) {
+    setPlacementMessage("");
     setState((prev) => {
       const empty = findEmptyBranch(prev);
       if (empty) {
@@ -92,12 +95,23 @@ export function CircuitsSim({ onBackToHome }: Props) {
     setSelected(null);
   }
 
+  function hasPlacementRoom(): boolean {
+    if (!findEmptyBranch(state) && state.sections.length >= 4) {
+      setPlacementMessage("The circuit is full: remove a section before adding another.");
+      return false;
+    }
+    setPlacementMessage("");
+    return true;
+  }
+
   function onAdd(type: Exclude<TrayType, "voltmeter">) {
+    if (!hasPlacementRoom()) return;
     placeComponent(componentFromTray(type, nextSerial()));
   }
 
   function onPlaceSeries() {
     if (selected === "voltmeter") return;
+    if (!hasPlacementRoom()) return;
     const type = selected ?? "resistor_10";
     placeComponent(componentFromTray(type, nextSerial()));
   }
@@ -165,6 +179,17 @@ export function CircuitsSim({ onBackToHome }: Props) {
     setState(next ?? getInitialCircuitState());
     setSelected(null);
     setSamples([]);
+    setReadings([]);
+    setPlacementMessage("");
+  }
+
+  function recordReading() {
+    const current = evaluation.totalCurrent;
+    if (!evaluation.isClosed || !Number.isFinite(current) || current <= 0) return;
+    setReadings((previous) => [
+      ...previous,
+      { voltage: evaluation.terminalV, current, resistance: evaluation.terminalV / current },
+    ].slice(-20));
   }
 
   if (mode === "exam") {
@@ -241,9 +266,16 @@ export function CircuitsSim({ onBackToHome }: Props) {
             onEmf={(cellEmf) => setState((s) => ({ ...s, cellEmf }))}
             onInternalR={(internalR) => setState((s) => ({ ...s, internalR }))}
           />
+          {placementMessage && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">{placementMessage}</p>}
         </div>
         <div className="lg:col-span-5">
-          <CircuitReadouts evaluation={evaluation} state={state} samples={samples} />
+          <CircuitReadouts
+            evaluation={evaluation}
+            state={state}
+            samples={samples}
+            readings={readings}
+            onRecordReading={recordReading}
+          />
         </div>
       </div>
     </div>

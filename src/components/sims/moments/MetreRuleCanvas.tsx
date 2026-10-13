@@ -39,16 +39,40 @@ function xOf(posM: number) {
 export function MetreRuleCanvas({ state, derived, onChange }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<{ kind: "load" | "pivot" | "bank"; id?: string; massKg?: number } | null>(null);
-  const tilt = derived.balanced ? 0 : Math.max(-16, Math.min(16, derived.net * 1.1));
+  const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(null);
+  const [dropZone, setDropZone] = useState<"beam" | "remove" | null>(null);
+  const tilt = derived.balanced ? 0 : Math.max(-16, Math.min(16, derived.net * 12));
   const pivotX = xOf(state.pivotM);
 
   function posFromX(x: number) {
     return snapPos((x - RULE_X0) / PX_PER_M);
   }
 
+  function rulePoint(point: { x: number; y: number }) {
+    const radians = (-tilt * Math.PI) / 180;
+    const dx = point.x - pivotX;
+    const dy = point.y - RULE_Y;
+    return {
+      x: pivotX + dx * Math.cos(radians) - dy * Math.sin(radians),
+      y: RULE_Y + dx * Math.sin(radians) + dy * Math.cos(radians),
+    };
+  }
+
+  function zoneAt(screenPoint: { x: number; y: number }): "beam" | "remove" | null {
+    if (screenPoint.x >= RULE_X0 && screenPoint.x <= RULE_X1 && screenPoint.y >= 34 && screenPoint.y <= 64) {
+      return "remove";
+    }
+    const beamPoint = rulePoint(screenPoint);
+    if (beamPoint.x >= RULE_X0 - 8 && beamPoint.x <= RULE_X1 + 8 && beamPoint.y >= 92 && beamPoint.y <= 204) {
+      return "beam";
+    }
+    return null;
+  }
+
   function onPointerDownLoad(e: React.PointerEvent, id: string) {
     svgRef.current?.setPointerCapture(e.pointerId);
     setDrag({ kind: "load", id });
+    setDropZone(null);
   }
 
   function onPointerDownPivot(e: React.PointerEvent) {
@@ -59,16 +83,21 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
   function onPointerDownBank(e: React.PointerEvent, massKg: number) {
     svgRef.current?.setPointerCapture(e.pointerId);
     setDrag({ kind: "bank", massKg });
+    const point = toSvg(svgRef.current!, e.clientX, e.clientY);
+    setDragPoint(point);
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (!drag || !svgRef.current) return;
-    const p = toSvg(svgRef.current, e.clientX, e.clientY);
+    const screenPoint = toSvg(svgRef.current, e.clientX, e.clientY);
+    const p = drag.kind === "pivot" ? screenPoint : rulePoint(screenPoint);
+    setDragPoint(screenPoint);
+    setDropZone(zoneAt(screenPoint));
     const posM = posFromX(p.x);
     if (drag.kind === "pivot") {
       onChange({ ...state, pivotM: Math.max(0.1, Math.min(0.9, posM)) });
     } else if (drag.kind === "load" && drag.id) {
-      const onBeam = p.y > 70 && p.y < 230;
+      const onBeam = zoneAt(screenPoint) === "beam";
       onChange({
         ...state,
         loads: onBeam
@@ -83,19 +112,22 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
       setDrag(null);
       return;
     }
-    const p = toSvg(svgRef.current, e.clientX, e.clientY);
+    const screenPoint = toSvg(svgRef.current, e.clientX, e.clientY);
+    const p = rulePoint(screenPoint);
     const posM = posFromX(p.x);
-    const onBeam = p.y > 70 && p.y < 210 && p.x >= RULE_X0 - 8 && p.x <= RULE_X1 + 8;
+    const zone = zoneAt(screenPoint);
 
-    if (drag.kind === "bank" && drag.massKg != null && onBeam) {
+    if (drag.kind === "bank" && drag.massKg != null && zone === "beam") {
       onChange({
         ...state,
         loads: [...state.loads, { id: `m${Date.now()}`, massKg: drag.massKg, posM }],
       });
-    } else if (drag.kind === "load" && drag.id && !onBeam) {
+    } else if (drag.kind === "load" && drag.id && zone === "remove") {
       onChange({ ...state, loads: state.loads.filter((l) => l.id !== drag.id) });
     }
     setDrag(null);
+    setDragPoint(null);
+    setDropZone(null);
   }
 
   const ticks = Array.from({ length: 11 }, (_, i) => i / 10);
@@ -108,13 +140,15 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
         className="h-auto w-full touch-none"
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={() => setDrag(null)}
+        onPointerCancel={() => { setDrag(null); setDragPoint(null); setDropZone(null); }}
         aria-label="Metre rule on a knife-edge pivot"
       >
         <rect width={VW} height={VH} fill="#0A0C10" />
         <text x="16" y="22" fill="#94A3B8" fontSize="11" fontFamily="monospace">
-          Drag masses onto the rule · drag the fulcrum · drag a mass off to remove
+          Drag a mass onto the rule · drag the fulcrum · move a load to REMOVE
         </text>
+        <rect x={RULE_X0} y="34" width={RULE_X1 - RULE_X0} height="30" rx="5" fill={dropZone === "remove" ? "#7F1D1D" : "#2A1115"} stroke="#F87171" strokeDasharray="5 4" opacity="0.9" />
+        <text x={VW / 2} y="53" textAnchor="middle" fill="#FCA5A5" fontSize="10" fontFamily="monospace" fontWeight="700">REMOVE LOAD</text>
         <text x={VW - 16} y="22" textAnchor="end" fill={derived.balanced ? "#34D399" : "#F59E0B"} fontSize="12" fontFamily="monospace" fontWeight="700">
           {derived.balanced ? "EQUILIBRIUM" : "UNBALANCED"}
         </text>
@@ -134,7 +168,7 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
           onPointerDown={onPointerDownPivot}
         />
 
-        <g transform={`rotate(${tilt} ${pivotX} ${RULE_Y})`}>
+        <g style={{ transform: `rotate(${tilt}deg)`, transformOrigin: `${pivotX}px ${RULE_Y}px`, transition: "transform 280ms ease-out" }}>
           <rect x={RULE_X0} y={RULE_Y - 7} width={RULE_X1 - RULE_X0} height="14" rx="2" fill="#B45309" />
           <rect x={RULE_X0} y={RULE_Y - 7} width={RULE_X1 - RULE_X0} height="6" fill="#F59E0B" opacity="0.35" />
           {ticks.map((m) => {
@@ -191,6 +225,13 @@ export function MetreRuleCanvas({ state, derived, onChange }: Props) {
               );
             })}
         </g>
+
+        {drag?.kind === "bank" && dragPoint && drag.massKg !== undefined && (
+          <g pointerEvents="none" opacity="0.72">
+            <rect x={dragPoint.x - 23} y={dragPoint.y - 12} width="46" height="24" rx="5" fill="#F59E0B" fillOpacity="0.25" stroke="#FCD34D" strokeDasharray="4 3" />
+            <text x={dragPoint.x} y={dragPoint.y + 4} textAnchor="middle" fill="#FCD34D" fontSize="10" fontFamily="monospace">{drag.massKg} kg</text>
+          </g>
+        )}
 
         {MASS_BANK_KG.map((m, i) => {
           const x = 70 + i * 70;

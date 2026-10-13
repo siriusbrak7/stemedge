@@ -1,10 +1,11 @@
 import type { ExamQuestion } from "@/components/ExamPlayer";
-import { format3SF } from "@/lib/format";
+import { format3SF } from "../../../lib/format.ts";
 
 export type EmSubMode = "motor" | "field" | "fleming";
 
 export interface ElectromagnetismState {
   currentA: number;
+  currentDirection: "forward" | "reverse";
   bFieldT: number;
   lengthM: number;
   /** +1 = into the page (×), −1 = out of the page (·) */
@@ -25,6 +26,7 @@ export interface ElectromagnetismPreset {
   name: string;
   description: string;
   currentA: number;
+  currentDirection: "forward" | "reverse";
   bFieldT: number;
   lengthM: number;
 }
@@ -34,6 +36,7 @@ export const ELECTROMAGNETISM_PRESETS: ElectromagnetismPreset[] = [
     name: "Lab wire",
     description: "Typical school bench: 2.0 A in 0.05 T over 0.50 m",
     currentA: 2,
+    currentDirection: "forward",
     bFieldT: 0.05,
     lengthM: 0.5,
   },
@@ -41,13 +44,15 @@ export const ELECTROMAGNETISM_PRESETS: ElectromagnetismPreset[] = [
     name: "Strong magnet",
     description: "0.20 T field, modest current",
     currentA: 3,
+    currentDirection: "forward",
     bFieldT: 0.2,
     lengthM: 0.4,
   },
   {
     name: "Reverse I",
-    description: "Negative current — force flips",
-    currentA: -4,
+    description: "Reverse conventional current — force flips",
+    currentA: 4,
+    currentDirection: "reverse",
     bFieldT: 0.1,
     lengthM: 0.8,
   },
@@ -55,6 +60,7 @@ export const ELECTROMAGNETISM_PRESETS: ElectromagnetismPreset[] = [
     name: "Zero current",
     description: "No I → no force",
     currentA: 0,
+    currentDirection: "forward",
     bFieldT: 0.1,
     lengthM: 1,
   },
@@ -63,6 +69,7 @@ export const ELECTROMAGNETISM_PRESETS: ElectromagnetismPreset[] = [
 export function getInitialElectromagnetismState(): ElectromagnetismState {
   return {
     currentA: 4,
+    currentDirection: "forward",
     bFieldT: 0.1,
     lengthM: 0.5,
     bIntoPage: true,
@@ -72,13 +79,15 @@ export function getInitialElectromagnetismState(): ElectromagnetismState {
 
 export function computeElectromagnetism(state: ElectromagnetismState): CalculatedElectromagnetism {
   const bSign = state.bIntoPage ? 1 : -1;
-  const forceN = state.bFieldT * state.currentA * state.lengthM * bSign;
+  const currentSign = state.currentDirection === "forward" ? 1 : -1;
+  const currentN = Math.max(0, state.currentA);
+  const forceN = state.bFieldT * currentN * state.lengthM * bSign * currentSign;
   const forceMagnitudeN = Math.abs(forceN);
   const directionSign = Math.abs(forceN) < 1e-6 ? 0 : forceN > 0 ? 1 : -1;
   const directionLabel =
     directionSign === 0 ? "No force" : directionSign > 0 ? "Upwards" : "Downwards";
-  const currentOutOfPage = state.currentA > 0;
-  const formulaLine = `F = BIL = ${format3SF(state.bFieldT)} × ${format3SF(state.currentA)} × ${format3SF(state.lengthM)} = ${format3SF(forceN)} N`;
+  const currentOutOfPage = state.currentDirection === "forward";
+  const formulaLine = `F = BIL = ${format3SF(state.bFieldT)} × ${format3SF(currentN)} × ${format3SF(state.lengthM)} = ${format3SF(forceN)} N`;
   return {
     forceN,
     forceMagnitudeN,
@@ -86,6 +95,23 @@ export function computeElectromagnetism(state: ElectromagnetismState): Calculate
     directionLabel,
     currentOutOfPage,
     formulaLine,
+  };
+}
+
+export const ELECTROMAGNETISM_TASKS = [
+  { id: 1, title: "Motor effect", prompt: "Set a non-zero current and magnetic field. Confirm the wire experiences a force." },
+  { id: 2, title: "Reverse current", prompt: "Reverse conventional current. The force should reverse while its magnitude stays the same." },
+  { id: 3, title: "Reverse the field", prompt: "Reverse the magnetic field. The force should reverse again." },
+];
+
+export function evaluateElectromagnetismTasks(
+  state: ElectromagnetismState,
+  result: CalculatedElectromagnetism,
+): Record<number, boolean> {
+  return {
+    1: state.currentA > 0 && state.bFieldT > 0 && result.forceMagnitudeN > 0,
+    2: state.currentDirection === "reverse" && result.forceMagnitudeN > 0,
+    3: !state.bIntoPage && result.forceMagnitudeN > 0,
   };
 }
 

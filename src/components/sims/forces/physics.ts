@@ -199,13 +199,19 @@ export function evaluateMotionTasks(args: {
   frictionN: number;
   running: boolean;
   timeS: number;
+  task3Baseline?: { massKg: number; resultantN: number };
 }): Record<number, boolean> {
   const coasting =
     args.running && Math.abs(args.resultantN) < 0.08 && Math.abs(args.velocity) > 0.4;
   const sloping =
     args.running && Math.abs(args.acceleration) > 0.4 && args.timeS > 0.6 && args.frictionN < 0.05;
-  const heavy = args.massKg >= 3.9 && Math.abs(args.resultantN) > 0.5;
-  const withFriction = args.frictionN >= 1.5 && Math.abs(args.resultantN) > 0.2;
+  const heavy =
+    args.task3Baseline !== undefined &&
+    args.task3Baseline.massKg > 0 &&
+    args.massKg >= args.task3Baseline.massKg * 1.95 &&
+    Math.abs(args.resultantN - args.task3Baseline.resultantN) <= 0.05;
+  const withFriction =
+    args.timeS > 0 && args.frictionN >= 1.5 && Math.abs(args.resultantN) > 0.2;
   return { 1: coasting, 2: sloping, 3: heavy, 4: withFriction };
 }
 

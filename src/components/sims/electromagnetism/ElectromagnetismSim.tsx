@@ -9,6 +9,8 @@ import { MagneticFieldCanvas } from "./MagneticFieldCanvas";
 import { MotorEffectCanvas } from "./MotorEffectCanvas";
 import {
   computeElectromagnetism,
+  ELECTROMAGNETISM_TASKS,
+  evaluateElectromagnetismTasks,
   generateElectromagnetismExamQuestions,
   getInitialElectromagnetismState,
   type ElectromagnetismPreset,
@@ -23,7 +25,10 @@ interface Props {
 export function ElectromagnetismSim({ onBackToHome }: Props) {
   const [mode, setMode] = useState<"explore" | "exam">("explore");
   const [state, setState] = useState<ElectromagnetismState>(getInitialElectromagnetismState);
+  const [taskId, setTaskId] = useState(1);
   const calculated = computeElectromagnetism(state);
+  const tasksDone = evaluateElectromagnetismTasks(state, calculated);
+  const currentTask = ELECTROMAGNETISM_TASKS.find((task) => task.id === taskId) ?? ELECTROMAGNETISM_TASKS[0];
 
   const setSub = useCallback((subMode: EmSubMode) => {
     setState((p) => ({ ...p, subMode }));
@@ -76,8 +81,7 @@ export function ElectromagnetismSim({ onBackToHome }: Props) {
           {state.subMode === "fleming" && <FlemingPanel state={state} calculated={calculated} />}
 
           <p className="font-mono text-[11px] text-ink-faint">
-            Drag current through zero and watch the force reverse. Length L is the highlighted span inside the field
-            region — that is the L in F = BIL.
+            Current magnitude is non-negative. Forward means right along the wire and out of the page in the field view; reverse means left and into the page. Length L is the highlighted span inside the field region.
           </p>
         </div>
 
@@ -87,6 +91,7 @@ export function ElectromagnetismSim({ onBackToHome }: Props) {
             state={state}
             calculated={calculated}
             onChangeCurrentA={(currentA) => setState((p) => ({ ...p, currentA }))}
+            onToggleCurrentDirection={() => setState((p) => ({ ...p, currentDirection: p.currentDirection === "forward" ? "reverse" : "forward" }))}
             onChangeBFieldT={(bFieldT) => setState((p) => ({ ...p, bFieldT }))}
             onChangeLengthM={(lengthM) => setState((p) => ({ ...p, lengthM }))}
             onToggleBDir={() => setState((p) => ({ ...p, bIntoPage: !p.bIntoPage }))}
@@ -94,6 +99,7 @@ export function ElectromagnetismSim({ onBackToHome }: Props) {
               setState((p) => ({
                 ...p,
                 currentA: preset.currentA,
+                currentDirection: preset.currentDirection,
                 bFieldT: preset.bFieldT,
                 lengthM: preset.lengthM,
               }))
@@ -101,6 +107,17 @@ export function ElectromagnetismSim({ onBackToHome }: Props) {
             onReset={() => setState(getInitialElectromagnetismState())}
           />
         </div>
+      </div>
+      <div className="rounded-xl border border-border-subtle bg-surface p-3">
+        <div className="mb-2 flex flex-wrap gap-2">
+          {ELECTROMAGNETISM_TASKS.map((task) => (
+            <button key={task.id} type="button" onClick={() => setTaskId(task.id)} className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${taskId === task.id ? "bg-accent text-accent-fg" : "border border-border-subtle text-ink-muted"}`}>
+              {tasksDone[task.id] ? "✓" : "○"} Task {task.id}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm font-medium text-ink">{currentTask.title}</p>
+        <p className="mt-1 text-xs text-ink-muted">{currentTask.prompt}</p>
       </div>
     </div>
   );
