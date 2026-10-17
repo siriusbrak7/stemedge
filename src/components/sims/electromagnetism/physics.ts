@@ -121,6 +121,12 @@ export function generateElectromagnetismExamQuestions(seed = 1): ExamQuestion[] 
   const currentA = seededPick(seed, "em-e1-current", [3, 4, 5]);
   const lengthM = seededPick(seed, "em-e1-length", [0.4, 0.5, 0.6]);
   const forceN = bFieldT * currentA * lengthM;
+  const knownForce = seededPick(seed, "em-e2-force", [0.16, 0.2, 0.24]);
+  const knownCurrent = seededPick(seed, "em-e2-current", [4, 5, 6]);
+  const knownLength = seededPick(seed, "em-e2-length", [0.5, 0.8, 1]);
+  const solvedB = knownForce / (knownCurrent * knownLength);
+  const zeroCurrentField = seededPick(seed, "em-e6-field", [0.08, 0.1, 0.12]);
+  const zeroCurrentLength = seededPick(seed, "em-e6-length", [0.4, 0.6, 0.8]);
   return [
     {
       id: "e1",
@@ -145,15 +151,15 @@ export function generateElectromagnetismExamQuestions(seed = 1): ExamQuestion[] 
       number: 2,
       marks: 2,
       paperRef: "0625/42 · Rearrange F = BIL",
-      prompt: "The force on a 0.80 m wire carrying 5.0 A is 0.20 N. Calculate B.",
+      prompt: `The force on a ${knownLength.toFixed(2)} m wire carrying ${knownCurrent.toFixed(1)} A is ${knownForce.toFixed(2)} N. Calculate B.`,
       kind: "numeric",
-      expected: 0.05,
+      expected: solvedB,
       unit: "T",
       tolerancePct: 2,
       working: {
         equation: "B = F / (I L)",
-        substitution: "0.20 / (5.0 × 0.80) = 0.050",
-        answer: "0.0500 T",
+        substitution: `${knownForce.toFixed(2)} / (${knownCurrent.toFixed(1)} × ${knownLength.toFixed(2)}) = ${solvedB.toFixed(3)}`,
+        answer: `${solvedB.toFixed(4)} T`,
       },
     },
     {
@@ -210,14 +216,14 @@ export function generateElectromagnetismExamQuestions(seed = 1): ExamQuestion[] 
       number: 6,
       marks: 2,
       paperRef: "0625/42",
-      prompt: "A wire in a 0.10 T field carries no current. The force on the wire is…",
+      prompt: `A wire in a ${zeroCurrentField.toFixed(2)} T field, ${zeroCurrentLength.toFixed(2)} m of it in the field, carries no current. The force on the wire is…`,
       kind: "numeric",
       expected: 0,
       unit: "N",
       tolerancePct: 1,
       working: {
         equation: "F = BIL",
-        substitution: "I = 0 → F = 0",
+        substitution: `I = 0 → ${zeroCurrentField.toFixed(2)} × 0 × ${zeroCurrentLength.toFixed(2)} = 0`,
         answer: "0 N",
       },
     },

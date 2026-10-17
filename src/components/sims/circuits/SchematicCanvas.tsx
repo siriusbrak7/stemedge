@@ -19,8 +19,9 @@ interface Props {
   onPlaceBranch: (sectionId: string, branchIndex: 0 | 1) => void;
   onRemove: (componentId: string) => void;
   onSplitParallel: (sectionId: string) => void;
-  onClipVoltmeter: (target: string | "supply") => void;
+  onClipVoltmeter: (target: string | "supply" | "switch" | null) => void;
   onToggleSwitch: () => void;
+  onUpdateComponent?: (id: string, updates: Partial<PathComponent>) => void;
 }
 
 interface LaidSection {
@@ -84,6 +85,101 @@ function ResistorSymbol({
       <text x={x} y={y + 4} textAnchor="middle" fill="#F1F5F9" fontSize="11" fontFamily="monospace" fontWeight="700">
         {ohms}
       </text>
+      {voltage !== null && (
+        <text x={x} y={y + 28} textAnchor="middle" fill="#FCD34D" fontSize="9" fontFamily="monospace">
+          {format3SF(voltage)} V
+        </text>
+      )}
+    </g>
+  );
+}
+
+function VariableResistorSymbol({
+  x,
+  y,
+  label,
+  value,
+  live,
+  voltage,
+}: {
+  x: number;
+  y: number;
+  label: string;
+  value: number;
+  live: boolean;
+  voltage: number | null;
+}) {
+  const ohms = resistorValueLabel(value);
+  const tag = label.split(" · ")[0];
+  return (
+    <g>
+      <line x1={x - 48} y1={y} x2={x - 24} y2={y} stroke={wire(live)} strokeWidth="2.2" />
+      <line x1={x + 24} y1={y} x2={x + 48} y2={y} stroke={wire(live)} strokeWidth="2.2" />
+      <text x={x} y={y - 18} textAnchor="middle" fill="#94A3B8" fontSize="9" fontFamily="monospace">
+        {tag}
+      </text>
+      <rect
+        x={x - 24}
+        y={y - 12}
+        width="48"
+        height="24"
+        rx="3"
+        fill="#182030"
+        stroke="#F59E0B"
+        strokeWidth="1.8"
+      />
+      <line x1={x - 18} y1={y + 16} x2={x + 20} y2={y - 16} stroke="#F59E0B" strokeWidth="1.6" />
+      <polygon
+        points={`${x + 20},${y - 16} ${x + 12},${y - 16} ${x + 19},${y - 9}`}
+        fill="#F59E0B"
+      />
+      <text x={x} y={y + 4} textAnchor="middle" fill="#FDE68A" fontSize="10" fontFamily="monospace" fontWeight="700">
+        {ohms}
+      </text>
+      {voltage !== null && (
+        <text x={x} y={y + 28} textAnchor="middle" fill="#FCD34D" fontSize="9" fontFamily="monospace">
+          {format3SF(voltage)} V
+        </text>
+      )}
+    </g>
+  );
+}
+
+function DiodeSymbol({
+  x,
+  y,
+  label,
+  live,
+  reversed,
+  voltage,
+}: {
+  x: number;
+  y: number;
+  label: string;
+  live: boolean;
+  reversed: boolean;
+  voltage: number | null;
+}) {
+  const tag = label.split(" · ")[0];
+  const color = reversed ? "#F43F5E" : live ? "#34D399" : "#10B981";
+  return (
+    <g>
+      <line x1={x - 48} y1={y} x2={x - 16} y2={y} stroke={wire(live && !reversed)} strokeWidth="2.2" />
+      <line x1={x + 16} y1={y} x2={x + 48} y2={y} stroke={wire(live && !reversed)} strokeWidth="2.2" />
+      <text x={x} y={y - 18} textAnchor="middle" fill={reversed ? "#FB7185" : "#94A3B8"} fontSize="9" fontFamily="monospace">
+        {tag} {reversed ? "(rev)" : "(fwd)"}
+      </text>
+      {reversed ? (
+        <>
+          <polygon points={`${x + 14},${y - 12} ${x + 14},${y + 12} ${x - 14},${y}`} fill="#3F1219" stroke={color} strokeWidth="1.8" />
+          <line x1={x - 14} y1={y - 12} x2={x - 14} y2={y + 12} stroke={color} strokeWidth="2" />
+        </>
+      ) : (
+        <>
+          <polygon points={`${x - 14},${y - 12} ${x - 14},${y + 12} ${x + 14},${y}`} fill="#0F2D24" stroke={color} strokeWidth="1.8" />
+          <line x1={x + 14} y1={y - 12} x2={x + 14} y2={y + 12} stroke={color} strokeWidth="2" />
+        </>
+      )}
       {voltage !== null && (
         <text x={x} y={y + 28} textAnchor="middle" fill="#FCD34D" fontSize="9" fontFamily="monospace">
           {format3SF(voltage)} V
@@ -178,6 +274,7 @@ export function SchematicCanvas({
   onSplitParallel,
   onClipVoltmeter,
   onToggleSwitch,
+  onUpdateComponent,
 }: Props) {
   const laid = layout(state.sections);
   const live = evaluation.isClosed;
@@ -197,6 +294,10 @@ export function SchematicCanvas({
           <AmmeterSymbol x={x} y={y} reading={evaluation.componentCurrent[c.id] ?? evaluation.ammeterReading} live={isLive} />
         ) : c.kind === "lamp" ? (
           <LampSymbol x={x} y={y} label={c.label} live={isLive} current={i} voltage={isLive ? v : 0} />
+        ) : c.kind === "variable_resistor" ? (
+          <VariableResistorSymbol x={x} y={y} label={c.label} value={c.value} live={isLive} voltage={isLive ? v : live ? 0 : null} />
+        ) : c.kind === "diode" ? (
+          <DiodeSymbol x={x} y={y} label={c.label} live={isLive} reversed={Boolean(c.reversed)} voltage={isLive ? v : live ? 0 : null} />
         ) : (
           <ResistorSymbol
             x={x}
@@ -208,26 +309,105 @@ export function SchematicCanvas({
           />
         )}
         <g
+          role="button" tabIndex={0} aria-label={`Remove ${c.label}`}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onRemove(c.id); } }}
           className="cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             onRemove(c.id);
           }}
         >
-          <rect x={x + 28} y={y - 28} width="18" height="18" rx="4" fill="#1E2333" stroke="#64748B" />
+          <rect x={x + 22} y={y - 34} width="30" height="30" rx="6" fill="#1E2333" stroke="#64748B" />
           <text x={x + 37} y={y - 15} textAnchor="middle" fill="#94A3B8" fontSize="12" className="pointer-events-none">
             ×
           </text>
         </g>
+        {!placingV && onUpdateComponent && c.kind === "variable_resistor" && (
+          <g className="font-mono text-[9px]">
+            <g
+              role="button"
+              tabIndex={0}
+              aria-label="Decrease variable resistance by 5 ohms"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  const n = Math.max(0, c.value - 5);
+                  onUpdateComponent(c.id, { value: n, label: c.label.replace(/\d+\s*Ω/, `${n} Ω`) });
+                }
+              }}
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                const nextVal = Math.max(0, c.value - 5);
+                onUpdateComponent(c.id, {
+                  value: nextVal,
+                  label: c.label.replace(/\d+\s*Ω/, `${nextVal} Ω`),
+                });
+              }}
+            >
+              <rect x={x - 44} y={y + 14} width="40" height="20" rx="4" fill="#0F172A" stroke="#475569" />
+              <text x={x - 24} y={y + 27} textAnchor="middle" fill="#CBD5E1">−5Ω</text>
+            </g>
+            <g
+              role="button"
+              tabIndex={0}
+              aria-label="Increase variable resistance by 5 ohms"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  const n = Math.min(50, c.value + 5);
+                  onUpdateComponent(c.id, { value: n, label: c.label.replace(/\d+\s*Ω/, `${n} Ω`) });
+                }
+              }}
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                const nextVal = Math.min(50, c.value + 5);
+                onUpdateComponent(c.id, {
+                  value: nextVal,
+                  label: c.label.replace(/\d+\s*Ω/, `${nextVal} Ω`),
+                });
+              }}
+            >
+              <rect x={x + 4} y={y + 14} width="40" height="20" rx="4" fill="#0F172A" stroke="#475569" />
+              <text x={x + 24} y={y + 27} textAnchor="middle" fill="#CBD5E1">+5Ω</text>
+            </g>
+          </g>
+        )}
+        {!placingV && onUpdateComponent && c.kind === "diode" && (
+          <g
+            role="button"
+            tabIndex={0}
+            aria-label="Flip diode polarity"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onUpdateComponent(c.id, { reversed: !c.reversed });
+              }
+            }}
+            className="cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateComponent(c.id, { reversed: !c.reversed });
+            }}
+          >
+            <rect x={x - 40} y={y + 14} width="80" height="20" rx="4" fill="#0F172A" stroke="#475569" />
+            <text x={x} y={y + 27} textAnchor="middle" fill="#CBD5E1" fontSize="9" fontFamily="monospace">
+              ⇄ Flip bias
+            </text>
+          </g>
+        )}
         {placingV && c.kind !== "ammeter" && (
           <g
+            role="button" tabIndex={0} aria-label={`Measure voltage across ${c.label}`}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClipVoltmeter(c.id); } }}
             className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
               onClipVoltmeter(c.id);
             }}
           >
-            <rect x={x - 32} y={y + 16} width="64" height="18" rx="4" fill="#082F49" stroke="#38BDF8" />
+            <rect x={x - 44} y={y + 14} width="88" height="24" rx="5" fill="#082F49" stroke="#38BDF8" />
             <text x={x} y={y + 28} textAnchor="middle" fill="#7DD3FC" fontSize="9" fontFamily="monospace">
               clip V here
             </text>
@@ -235,15 +415,17 @@ export function SchematicCanvas({
         )}
         {c.kind !== "ammeter" && seriesOwner && (
           <g
+            role="button" tabIndex={0} aria-label={`Split ${c.label} into parallel branches`}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSplitParallel(seriesOwner.id); } }}
             className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
               onSplitParallel(seriesOwner.id);
             }}
           >
-            <rect x={x - 40} y={y - 48} width="80" height="16" rx="4" fill="#1E1B4B" stroke="#818CF8" />
-            <text x={x} y={y - 37} textAnchor="middle" fill="#C4B5FD" fontSize="8" fontFamily="monospace">
-              add in parallel
+            <rect x={x - 48} y={y - 42} width="96" height="18" rx="4" fill="#1E1B4B" stroke="#818CF8" />
+            <text x={x} y={y - 30} textAnchor="middle" fill="#C4B5FD" fontSize="8.5" fontFamily="monospace">
+              + add parallel
             </text>
           </g>
         )}
@@ -252,9 +434,11 @@ export function SchematicCanvas({
   }
 
   const vTarget = state.voltmeterAcross;
-  let vLead: { x1: number; x2: number; y: number } | null = null;
+  let vLead: { x1: number; x2: number; y: number; isBottom?: boolean } | null = null;
   if (vTarget === "supply") {
     vLead = { x1: CELL_X + 18, x2: LEFT - 8, y: TOP };
+  } else if (vTarget === "switch") {
+    vLead = { x1: switchX - 16, x2: switchX + 22, y: BOT, isBottom: true };
   } else if (vTarget) {
     for (const item of laid) {
       if (item.section.type === "series" && item.section.component.id === vTarget) {
@@ -281,22 +465,41 @@ export function SchematicCanvas({
           <span className="font-mono text-xs font-bold uppercase tracking-wide text-ink">
             Cambridge schematic
           </span>
+          {state.voltmeterAcross && (
+            <button
+              type="button"
+              onClick={() => onClipVoltmeter(null)}
+              className="flex items-center gap-1 rounded border border-sky-400/40 bg-sky-950/60 px-2 py-0.5 font-mono text-[10px] text-sky-300 hover:bg-sky-900"
+              title="Remove voltmeter probes from the circuit"
+            >
+              ✕ Unclip voltmeter
+            </button>
+          )}
         </div>
         <span className="font-mono text-[11px] text-ink-faint">
           {placingV
-            ? "Clip the voltmeter across the cell or a load"
+            ? "Clip the voltmeter across the cell, a load, or the switch"
             : "Tap a tray part to add it, or a dashed branch slot to fill it"}
         </span>
       </div>
 
       <div className="w-full overflow-x-auto">
-        <svg viewBox={`0 0 ${VW} ${VH}`} className="h-auto w-full">
+        <svg role="group" aria-label="Interactive electrical circuit schematic. Use the switch, component controls, or tray to change the circuit." viewBox={`0 0 ${VW} ${VH}`} className="h-auto w-full">
           <defs>
             <pattern id={`${flowId}-grid`} width="20" height="20" patternUnits="userSpaceOnUse">
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#171C2B" strokeWidth="0.8" />
             </pattern>
           </defs>
           <rect width={VW} height={VH} fill={`url(#${flowId}-grid)`} />
+
+          {evaluation.isShort && (
+            <g className="animate-pulse">
+              <rect x={180} y={10} width={360} height={28} rx={6} fill="#450A0A" stroke="#EF4444" strokeWidth="1.5" />
+              <text x={360} y={28} textAnchor="middle" fill="#FCA5A5" fontSize="11" fontFamily="monospace" fontWeight="700">
+                ⚠️ SHORT CIRCUIT · Excessive Current (I → ∞)
+              </text>
+            </g>
+          )}
 
           <path
             d={loopD}
@@ -328,8 +531,8 @@ export function SchematicCanvas({
               </text>
             )}
             {placingV && (
-              <g className="cursor-pointer" onClick={() => onClipVoltmeter("supply")}>
-                <rect x={CELL_X - 32} y={198} width="64" height="18" rx="4" fill="#082F49" stroke="#38BDF8" />
+              <g role="button" tabIndex={0} aria-label="Measure voltage across the cell" onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClipVoltmeter("supply"); } }} className="cursor-pointer" onClick={() => onClipVoltmeter("supply")}>
+                <rect x={CELL_X - 44} y={195} width="88" height="24" rx="5" fill="#082F49" stroke="#38BDF8" />
                 <text x={CELL_X} y={210} textAnchor="middle" fill="#7DD3FC" fontSize="8" fontFamily="monospace">
                   clip V (cell)
                 </text>
@@ -337,7 +540,7 @@ export function SchematicCanvas({
             )}
           </g>
 
-          <g className="cursor-pointer" onClick={onToggleSwitch}>
+          <g role="button" tabIndex={0} aria-pressed={!switchOpen} aria-label={`Switch ${switchOpen ? "open" : "closed"}; activate to toggle`} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleSwitch(); } }} className="cursor-pointer" onClick={onToggleSwitch}>
             <line x1={switchX - 28} y1={BOT} x2={switchX - 10} y2={BOT} stroke={live || !switchOpen ? "#F59E0B" : "#475569"} strokeWidth="2.4" />
             <line
               x1={switchX - 10}
@@ -356,6 +559,27 @@ export function SchematicCanvas({
               {switchOpen ? "switch OPEN" : "switch CLOSED"}
             </text>
           </g>
+
+          {placingV && (
+            <g
+              role="button"
+              tabIndex={0}
+              aria-label="Measure voltage across the switch"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onClipVoltmeter("switch");
+                }
+              }}
+              className="cursor-pointer"
+              onClick={() => onClipVoltmeter("switch")}
+            >
+              <rect x={switchX - 44} y={BOT + 32} width="88" height="22" rx="4" fill="#082F49" stroke="#38BDF8" />
+              <text x={switchX} y={BOT + 46} textAnchor="middle" fill="#7DD3FC" fontSize="8" fontFamily="monospace">
+                clip V (switch)
+              </text>
+            </g>
+          )}
 
           {live && (
             <>
@@ -376,17 +600,31 @@ export function SchematicCanvas({
             const y2 = TOP + 58;
             const i0 = evaluation.branchCurrents[`${item.section.id}:0`];
             const i1 = evaluation.branchCurrents[`${item.section.id}:1`];
+            const b0Live = live && b0.length > 0 && Math.abs(i0 ?? 0) > 0.001;
+            const b1Live = live && b1.length > 0 && Math.abs(i1 ?? 0) > 0.001;
             return (
               <g key={item.section.id}>
-                <line x1={item.x} y1={TOP} x2={item.x} y2={y2} stroke={wire(live)} strokeWidth="2" />
-                <line x1={item.x + item.w} y1={TOP} x2={item.x + item.w} y2={y2} stroke={wire(live)} strokeWidth="2" />
-                <line x1={item.x} y1={y2} x2={item.x + item.w} y2={y2} stroke={wire(live)} strokeWidth="2" />
-                {Number.isFinite(i0) && live && (
+                {/* Vertical split rails */}
+                <line x1={item.x} y1={TOP} x2={item.x} y2={y2} stroke={b1Live ? wire(live) : "#475569"} strokeWidth="2" />
+                <line x1={item.x + item.w} y1={TOP} x2={item.x + item.w} y2={y2} stroke={b1Live ? wire(live) : "#475569"} strokeWidth="2" />
+                {/* Horizontal branch rails */}
+                <line x1={item.x} y1={TOP} x2={item.x + item.w} y2={TOP} stroke={wire(b0Live)} strokeWidth="2" />
+                <line x1={item.x} y1={y2} x2={item.x + item.w} y2={y2} stroke={wire(b1Live)} strokeWidth="2" />
+
+                {/* Junction flow indicators */}
+                {b0Live && (
+                  <polygon points={`${item.x + 18},${TOP} ${item.x + 10},${TOP - 4} ${item.x + 10},${TOP + 4}`} fill="#FCD34D" />
+                )}
+                {b1Live && (
+                  <polygon points={`${item.x + 18},${y2} ${item.x + 10},${y2 - 4} ${item.x + 10},${y2 + 4}`} fill="#FCD34D" />
+                )}
+
+                {Number.isFinite(i0) && b0Live && (
                   <text x={item.x - 4} y={TOP + 28} textAnchor="end" fill="#FCD34D" fontSize="8" fontFamily="monospace">
                     {format3SF(i0)} A
                   </text>
                 )}
-                {Number.isFinite(i1) && live && (
+                {Number.isFinite(i1) && b1Live && (
                   <text x={item.x - 4} y={y2 - 6} textAnchor="end" fill="#FCD34D" fontSize="8" fontFamily="monospace">
                     {format3SF(i1)} A
                   </text>
@@ -395,6 +633,8 @@ export function SchematicCanvas({
                   renderComp(b0[0], cx, TOP)
                 ) : (
                   <g
+                    role="button" tabIndex={0} aria-label="Add a component to parallel branch 1"
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPlaceBranch(item.section.id, 0); } }}
                     className="cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -408,6 +648,8 @@ export function SchematicCanvas({
                   renderComp(b1[0], cx, y2)
                 ) : (
                   <g
+                    role="button" tabIndex={0} aria-label="Add a component to parallel branch 2"
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPlaceBranch(item.section.id, 1); } }}
                     className="cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -421,8 +663,11 @@ export function SchematicCanvas({
             );
           })}
 
-          {state.sections.length < 4 && (
+          {state.sections.length < 4 && !placingV && (
             <g
+              role={placingV ? undefined : "button"} tabIndex={placingV ? undefined : 0}
+              aria-label={placingV ? undefined : "Add a component in series"}
+              onKeyDown={(e) => { if (!placingV && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onPlaceSeries(); } }}
               className="cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
@@ -432,8 +677,8 @@ export function SchematicCanvas({
               <EmptySlot
                 x={trailingX}
                 y={TOP}
-                label={state.sections.length === 0 ? "tap to add 10 Ω" : placingV ? "clip V to a load" : "tap tray to add"}
-                active={placingV}
+                label={state.sections.length === 0 ? "tap to add 10 Ω" : "tap tray to add"}
+                active={false}
               />
             </g>
           )}
@@ -446,13 +691,44 @@ export function SchematicCanvas({
 
           {vLead && (
             <g>
-              <line x1={vLead.x1} y1={vLead.y} x2={vLead.x1} y2={BOT - 48} stroke="#38BDF8" strokeWidth="1.4" strokeDasharray="3 3" />
-              <line x1={vLead.x2} y1={vLead.y} x2={vLead.x2} y2={BOT - 48} stroke="#38BDF8" strokeWidth="1.4" strokeDasharray="3 3" />
-              <line x1={vLead.x1} y1={BOT - 48} x2={vLead.x2} y2={BOT - 48} stroke="#38BDF8" strokeWidth="1.4" strokeDasharray="3 3" />
-              <circle cx={(vLead.x1 + vLead.x2) / 2} cy={BOT - 48} r="16" fill="#0F2133" stroke="#0EA5E9" strokeWidth="2" />
+              <line
+                x1={vLead.x1}
+                y1={vLead.y}
+                x2={vLead.x1}
+                y2={vLead.isBottom ? BOT + 48 : BOT - 48}
+                stroke="#38BDF8"
+                strokeWidth="1.4"
+                strokeDasharray="3 3"
+              />
+              <line
+                x1={vLead.x2}
+                y1={vLead.y}
+                x2={vLead.x2}
+                y2={vLead.isBottom ? BOT + 48 : BOT - 48}
+                stroke="#38BDF8"
+                strokeWidth="1.4"
+                strokeDasharray="3 3"
+              />
+              <line
+                x1={vLead.x1}
+                y1={vLead.isBottom ? BOT + 48 : BOT - 48}
+                x2={vLead.x2}
+                y2={vLead.isBottom ? BOT + 48 : BOT - 48}
+                stroke="#38BDF8"
+                strokeWidth="1.4"
+                strokeDasharray="3 3"
+              />
+              <circle
+                cx={(vLead.x1 + vLead.x2) / 2}
+                cy={vLead.isBottom ? BOT + 48 : BOT - 48}
+                r="16"
+                fill="#0F2133"
+                stroke="#0EA5E9"
+                strokeWidth="2"
+              />
               <text
                 x={(vLead.x1 + vLead.x2) / 2}
-                y={BOT - 43}
+                y={vLead.isBottom ? BOT + 53 : BOT - 43}
                 textAnchor="middle"
                 fill="#38BDF8"
                 fontSize="13"
@@ -462,7 +738,7 @@ export function SchematicCanvas({
               </text>
               <text
                 x={(vLead.x1 + vLead.x2) / 2}
-                y={BOT - 26}
+                y={vLead.isBottom ? BOT + 70 : BOT - 26}
                 textAnchor="middle"
                 fill="#7DD3FC"
                 fontSize="9"

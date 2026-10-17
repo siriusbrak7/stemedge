@@ -67,6 +67,12 @@ export function generateRefractionExamQuestions(seed = 1): ExamQuestion[] {
   const incidenceDeg = seededPick(seed, "refraction-r1-incidence", [35, 40, 45]);
   const refractionDeg = seededPick(seed, "refraction-r1-refraction", [20, 25, 30]);
   const refractiveIndex = Math.sin((incidenceDeg * Math.PI) / 180) / Math.sin((refractionDeg * Math.PI) / 180);
+  const criticalIndex = seededPick(seed, "refraction-r2-index", [1.4, 1.5, 1.6]);
+  const criticalAngle = (Math.asin(1 / criticalIndex) * 180) / Math.PI;
+  const waterIndex = seededPick(seed, "refraction-r4-water-index", [1.3, 1.33, 1.36]);
+  const waterIncidence = seededPick(seed, "refraction-r4-angle", [25, 30, 35]);
+  const refractedSine = waterIndex * Math.sin((waterIncidence * Math.PI) / 180);
+  const waterRefraction = (Math.asin(refractedSine) * 180) / Math.PI;
   return [
     {
       id: "r1",
@@ -90,15 +96,15 @@ export function generateRefractionExamQuestions(seed = 1): ExamQuestion[] {
       number: 2,
       marks: 2,
       paperRef: "0625/43 · Critical angle",
-      prompt: "Glass of n = 1.50 meets air. Calculate the critical angle.",
+      prompt: `Glass of n = ${criticalIndex.toFixed(2)} meets air. Calculate the critical angle.`,
       kind: "numeric",
-      expected: 41.8,
+      expected: criticalAngle,
       unit: "°",
       tolerancePct: 2,
       working: {
         equation: "sin c = 1 / n",
-        substitution: "c = sin⁻¹(1/1.50) = 41.8°",
-        answer: "41.8°",
+        substitution: `c = sin⁻¹(1/${criticalIndex.toFixed(2)}) = ${criticalAngle.toFixed(1)}°`,
+        answer: `${criticalAngle.toFixed(1)}°`,
       },
     },
     {
@@ -126,15 +132,15 @@ export function generateRefractionExamQuestions(seed = 1): ExamQuestion[] {
       number: 4,
       marks: 2,
       paperRef: "0625/43",
-      prompt: "Light in water (n = 1.33) is incident at 30° on a water–air surface. Calculate the angle of refraction in air.",
+      prompt: `Light in water (n = ${waterIndex.toFixed(2)}) is incident at ${waterIncidence}° on a water–air surface. Calculate the angle of refraction in air.`,
       kind: "numeric",
-      expected: 41.7,
+      expected: waterRefraction,
       unit: "°",
       tolerancePct: 3,
       working: {
         equation: "n1 sin i = n2 sin r",
-        substitution: "1.33 sin 30° = 1.00 sin r → r = 41.7°",
-        answer: "41.7°",
+        substitution: `${waterIndex.toFixed(2)} sin ${waterIncidence}° = sin r → r = ${waterRefraction.toFixed(1)}°`,
+        answer: `${waterRefraction.toFixed(1)}°`,
       },
     },
   ];

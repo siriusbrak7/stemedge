@@ -7,8 +7,8 @@ import {
 } from "./physics";
 
 const VW = 640;
-const VH = 280;
-const GROUND_Y = 188;
+const VH = 300;
+const GROUND_Y = 200;
 const PX_PER_M = 48;
 const TROLLEY_W = 72;
 const TROLLEY_H = 40;
@@ -19,13 +19,64 @@ interface Props {
   positionM: number;
   velocity: number;
   hitEnd: "min" | "max" | null;
+  showVerticalForces: boolean;
+  showVectors: boolean;
 }
 
 function arrowLen(newtons: number): number {
-  return Math.min(18 + Math.abs(newtons) * 6.5, 110);
+  return Math.abs(newtons) * 5;
 }
 
-export function ForcesCanvas({ state, derived, positionM, velocity, hitEnd }: Props) {
+function HArrow({
+  dir,
+  len,
+  originX,
+  originY,
+  color,
+  label,
+  labelY,
+}: {
+  dir: 1 | -1;
+  len: number;
+  originX: number;
+  originY: number;
+  color: string;
+  label: string;
+  labelY: number;
+}) {
+  const tipX = originX + dir * len;
+  const arrowPoints =
+    dir > 0
+      ? `${tipX + 8},${originY} ${tipX - 4},${originY - 6} ${tipX - 4},${originY + 6}`
+      : `${tipX - 8},${originY} ${tipX + 4},${originY - 6} ${tipX + 4},${originY + 6}`;
+  return (
+    <>
+      <line x1={originX} y1={originY} x2={tipX} y2={originY} stroke={color} strokeWidth="3" />
+      <polygon points={arrowPoints} fill={color} />
+      <text
+        x={(originX + tipX) / 2}
+        y={labelY}
+        textAnchor="middle"
+        fill={color}
+        fontSize="10"
+        fontFamily="monospace"
+        fontWeight="700"
+      >
+        {label}
+      </text>
+    </>
+  );
+}
+
+export function ForcesCanvas({
+  state,
+  derived,
+  positionM,
+  velocity,
+  hitEnd,
+  showVerticalForces,
+  showVectors,
+}: Props) {
   const cam = positionM * PX_PER_M - VW / 2 + 40;
   const trolleyX = positionM * PX_PER_M - cam;
   const worldToScreen = (m: number) => m * PX_PER_M - cam;
@@ -36,15 +87,21 @@ export function ForcesCanvas({ state, derived, positionM, velocity, hitEnd }: Pr
   const leftLen = arrowLen(state.leftN);
   const rightLen = arrowLen(state.rightN);
   const fricLen = arrowLen(Math.abs(derived.frictionSignedN));
-  const resLen = arrowLen(Math.abs(derived.resultantN));
+  const resLen = Math.max(10, arrowLen(derived.resultantN));
   const resRight = derived.resultantN >= 0;
   const fricRight = derived.frictionSignedN >= 0;
-  const movingRight = velocity > 0.05;
-  const movingLeft = velocity < -0.05;
+
+  const velLen = Math.min(Math.abs(velocity) * 14, 90);
+  const velDir: 1 | -1 = velocity >= 0 ? 1 : -1;
+  const accLen = Math.min(Math.abs(derived.acceleration) * 14, 90);
+  const accDir: 1 | -1 = derived.acceleration >= 0 ? 1 : -1;
+
+  const weightN = state.massKg * 9.81;
+  const weightLen = Math.min(weightN * 2.5, 90);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border-faint bg-[#0A0C10]">
-      <svg viewBox={`0 0 ${VW} ${VH}`} className="h-auto w-full" aria-label="Trolley on a metre track">
+    <div className="mx-auto w-full max-w-[960px] overflow-hidden rounded-xl border border-border-faint bg-[#0A0C10]">
+      <svg viewBox={`0 0 ${VW} ${VH}`} className="h-auto w-full" role="img" aria-label="Force diagram showing a trolley, applied forces, friction and resultant force">
         <rect width={VW} height={VH} fill="#0A0C10" />
 
         {ticks.map((m) => {
@@ -76,22 +133,23 @@ export function ForcesCanvas({ state, derived, positionM, velocity, hitEnd }: Pr
           stroke="#64748B"
           strokeWidth="4"
         />
+        <text x={worldToScreen(TRACK_MIN_M) + 5} y={GROUND_Y - 42} fill="#CBD5E1" fontSize="12" fontFamily="monospace">wall</text>
+        <text x={worldToScreen(TRACK_MAX_M) - 5} y={GROUND_Y - 42} textAnchor="end" fill="#CBD5E1" fontSize="12" fontFamily="monospace">wall</text>
 
         <g transform={`translate(${trolleyX}, ${GROUND_Y})`}>
-          {(movingRight || movingLeft) &&
+          {Math.abs(velocity) > 0.05 &&
             [18, 34, 50].map((dx) => (
               <line
                 key={dx}
-                x1={movingRight ? -TROLLEY_W / 2 - dx : TROLLEY_W / 2 + dx}
+                x1={velocity > 0 ? -TROLLEY_W / 2 - dx : TROLLEY_W / 2 + dx}
                 y1={-14}
-                x2={movingRight ? -TROLLEY_W / 2 - dx - 10 : TROLLEY_W / 2 + dx + 10}
+                x2={velocity > 0 ? -TROLLEY_W / 2 - dx - 10 : TROLLEY_W / 2 + dx + 10}
                 y2={-14}
                 stroke="#F59E0B"
                 strokeWidth="2"
                 opacity={0.35}
               />
             ))}
-
           <rect
             x={-TROLLEY_W / 2}
             y={-TROLLEY_H - 8}
@@ -109,97 +167,155 @@ export function ForcesCanvas({ state, derived, positionM, velocity, hitEnd }: Pr
           </text>
 
           {state.rightN > 0.05 && (
-            <g>
-              <line x1={TROLLEY_W / 2} y1={-28} x2={TROLLEY_W / 2 + rightLen} y2={-28} stroke="#F59E0B" strokeWidth="3.2" />
-              <polygon
-                points={`${TROLLEY_W / 2 + rightLen + 8},-28 ${TROLLEY_W / 2 + rightLen - 4},-34 ${TROLLEY_W / 2 + rightLen - 4},-22`}
-                fill="#F59E0B"
-              />
-              <text x={TROLLEY_W / 2 + rightLen / 2} y={-36} textAnchor="middle" fill="#FCD34D" fontSize="10" fontFamily="monospace">
-                {format3SF(state.rightN)} N
-              </text>
-            </g>
+            <HArrow
+              dir={1}
+              len={rightLen}
+              originX={TROLLEY_W / 2}
+              originY={-28}
+              color="#F59E0B"
+              label={`${format3SF(state.rightN)} N`}
+              labelY={-38}
+            />
           )}
           {state.leftN > 0.05 && (
-            <g>
-              <line x1={-TROLLEY_W / 2} y1={-28} x2={-TROLLEY_W / 2 - leftLen} y2={-28} stroke="#38BDF8" strokeWidth="3.2" />
-              <polygon
-                points={`${-TROLLEY_W / 2 - leftLen - 8},-28 ${-TROLLEY_W / 2 - leftLen + 4},-34 ${-TROLLEY_W / 2 - leftLen + 4},-22`}
-                fill="#38BDF8"
-              />
-              <text x={-TROLLEY_W / 2 - leftLen / 2} y={-36} textAnchor="middle" fill="#7DD3FC" fontSize="10" fontFamily="monospace">
-                {format3SF(state.leftN)} N
-              </text>
-            </g>
+            <HArrow
+              dir={-1}
+              len={leftLen}
+              originX={-TROLLEY_W / 2}
+              originY={-28}
+              color="#38BDF8"
+              label={`${format3SF(state.leftN)} N`}
+              labelY={-38}
+            />
           )}
+
           {Math.abs(derived.frictionSignedN) > 0.05 && (
-            <g>
-              {fricRight ? (
-                <>
-                  <line x1={TROLLEY_W / 2} y1={-8} x2={TROLLEY_W / 2 + fricLen} y2={-8} stroke="#F87171" strokeWidth="2.4" />
-                  <polygon
-                    points={`${TROLLEY_W / 2 + fricLen + 7},-8 ${TROLLEY_W / 2 + fricLen - 3},-13 ${TROLLEY_W / 2 + fricLen - 3},-3`}
-                    fill="#F87171"
-                  />
-                </>
-              ) : (
-                <>
-                  <line x1={-TROLLEY_W / 2} y1={-8} x2={-TROLLEY_W / 2 - fricLen} y2={-8} stroke="#F87171" strokeWidth="2.4" />
-                  <polygon
-                    points={`${-TROLLEY_W / 2 - fricLen - 7},-8 ${-TROLLEY_W / 2 - fricLen + 3},-13 ${-TROLLEY_W / 2 - fricLen + 3},-3`}
-                    fill="#F87171"
-                  />
-                </>
+            <>
+              <HArrow
+                dir={fricRight ? 1 : -1}
+                len={fricLen}
+                originX={fricRight ? TROLLEY_W / 2 : -TROLLEY_W / 2}
+                originY={-4}
+                color="#F87171"
+                label={`f = ${format3SF(Math.abs(derived.frictionSignedN))} N`}
+                labelY={10}
+              />
+              {derived.heldAtRest && (
+                <text x="0" y={22} textAnchor="middle" fill="#FCA5A5" fontSize="8" fontFamily="monospace">
+                  (static — holds trolley at rest)
+                </text>
               )}
-              <text
-                x={fricRight ? TROLLEY_W / 2 + fricLen / 2 : -TROLLEY_W / 2 - fricLen / 2}
-                y={6}
-                textAnchor="middle"
-                fill="#FCA5A5"
-                fontSize="9"
-                fontFamily="monospace"
-              >
-                friction {format3SF(Math.abs(derived.frictionSignedN))} N
+            </>
+          )}
+
+          {showVectors && Math.abs(velocity) > 0.05 && (
+            <HArrow
+              dir={velDir}
+              len={velLen}
+              originX={0}
+              originY={-TROLLEY_H - 20}
+              color="#34D399"
+              label={`v=${format3SF(velocity)} m/s`}
+              labelY={-TROLLEY_H - 32}
+            />
+          )}
+          {showVectors && Math.abs(derived.acceleration) > 0.01 && (
+            <HArrow
+              dir={accDir}
+              len={accLen}
+              originX={0}
+              originY={-TROLLEY_H - 50}
+              color="#22D3EE"
+              label={`a=${format3SF(derived.acceleration)} m/s²`}
+              labelY={-TROLLEY_H - 62}
+            />
+          )}
+
+          {showVerticalForces && (
+            <>
+              <line x1={0} y1={-TROLLEY_H / 2 - 8} x2={0} y2={-TROLLEY_H / 2 - 8 + weightLen} stroke="#A78BFA" strokeWidth="2.5" />
+              <polygon
+                points={`0,${-TROLLEY_H / 2 - 8 + weightLen + 8} -5,${-TROLLEY_H / 2 - 8 + weightLen} 5,${-TROLLEY_H / 2 - 8 + weightLen}`}
+                fill="#A78BFA"
+              />
+              <text x={14} y={-TROLLEY_H / 2 - 8 + weightLen / 2} fill="#C4B5FD" fontSize="9" fontFamily="monospace">
+                W={format3SF(weightN)} N
               </text>
-            </g>
+              <line x1={0} y1={0} x2={0} y2={-weightLen} stroke="#86EFAC" strokeWidth="2.5" />
+              <polygon
+                points={`0,${-weightLen - 8} -5,${-weightLen} 5,${-weightLen}`}
+                fill="#86EFAC"
+              />
+              <text x={14} y={-weightLen / 2} fill="#86EFAC" fontSize="9" fontFamily="monospace">
+                R={format3SF(weightN)} N
+              </text>
+            </>
           )}
         </g>
 
-        {Math.abs(derived.resultantN) > 0.05 && (
-          <g transform={`translate(${trolleyX}, ${GROUND_Y + 48})`}>
+        {Math.abs(derived.resultantN) > 0.05 ? (
+          <g transform={`translate(${trolleyX}, ${GROUND_Y + 52})`}>
             {resRight ? (
               <>
-                <line x1={0} y1={0} x2={resLen} y2={0} stroke="#FBBF24" strokeWidth="3.4" />
+                <line x1={0} y1={0} x2={resLen} y2={0} stroke="#FBBF24" strokeWidth="3" strokeDasharray="6,3" />
                 <polygon points={`${resLen + 9},0 ${resLen - 4},-7 ${resLen - 4},7`} fill="#FBBF24" />
               </>
             ) : (
               <>
-                <line x1={0} y1={0} x2={-resLen} y2={0} stroke="#FBBF24" strokeWidth="3.4" />
+                <line x1={0} y1={0} x2={-resLen} y2={0} stroke="#FBBF24" strokeWidth="3" strokeDasharray="6,3" />
                 <polygon points={`${-resLen - 9},0 ${-resLen + 4},-7 ${-resLen + 4},7`} fill="#FBBF24" />
               </>
             )}
-            <text x={0} y={-10} textAnchor="middle" fill="#FCD34D" fontSize="10" fontFamily="monospace" fontWeight="700">
-              F_res {format3SF(derived.resultantN)} N
+            <text
+              x={resRight ? resLen / 2 : -resLen / 2}
+              y={-10}
+              textAnchor="middle"
+              fill="#FCD34D"
+              fontSize="10"
+              fontFamily="monospace"
+              fontWeight="700"
+            >
+              RESULTANT: {format3SF(derived.resultantN)} N
+            </text>
+            <text
+              x={resRight ? resLen / 2 : -resLen / 2}
+              y={16}
+              textAnchor="middle"
+              fill="#94A3B8"
+              fontSize="8"
+              fontFamily="monospace"
+            >
+          (vector sum · not an extra applied force)
             </text>
           </g>
-        )}
-        {Math.abs(derived.resultantN) <= 0.05 && (
-          <text x={trolleyX} y={GROUND_Y + 52} textAnchor="middle" fill="#64748B" fontSize="11" fontFamily="monospace">
-            F_res = 0  ·  Newton 1
+        ) : (
+          <text x={trolleyX} y={GROUND_Y + 60} textAnchor="middle" fill="#64748B" fontSize="11" fontFamily="monospace">
+            F_res = 0 · Newton's 1st Law (Balanced)
           </text>
         )}
 
-        <text x="16" y="22" fill="#94A3B8" fontSize="11" fontFamily="monospace">
+        <text x="16" y="24" fill="#F1F5F9" fontSize="14" fontFamily="monospace">
           s = {format3SF(positionM)} m   v = {format3SF(velocity)} m/s   a = {format3SF(derived.acceleration)} m/s²
         </text>
-        <text x="16" y="40" fill="#64748B" fontSize="10" fontFamily="monospace">
-          {derived.newton === "first" ? "Newton 1 — constant velocity" : "Newton 2 — F = ma"}
+        <text x="16" y="46" fill="#CBD5E1" fontSize="13" fontFamily="monospace">
+          {derived.newton === "first" ? "Newton 1 — constant velocity (F_res = 0)" : "Newton 2 — F = ma (F_res ≠ 0)"}
         </text>
         {hitEnd && (
-          <text x={VW - 16} y="22" textAnchor="end" fill="#F87171" fontSize="11" fontFamily="monospace">
-            End of bench — reverse the force or reset
+          <text x="16" y="66" fill="#FCA5A5" fontSize="13" fontFamily="monospace">
+            Wall collision: the track stops the trolley; wall contact is outside the force model
           </text>
         )}
+        <g transform={`translate(16, ${VH - 24})`}>
+          <line x1="0" y1="0" x2="16" y2="0" stroke="#38BDF8" strokeWidth="3" />
+          <text x="20" y="3" fill="#CBD5E1" fontSize="9" fontFamily="monospace">left</text>
+          <line x1="58" y1="0" x2="74" y2="0" stroke="#F59E0B" strokeWidth="3" />
+          <text x="78" y="3" fill="#CBD5E1" fontSize="9" fontFamily="monospace">right</text>
+          <line x1="126" y1="0" x2="142" y2="0" stroke="#F87171" strokeWidth="3" />
+          <text x="146" y="3" fill="#CBD5E1" fontSize="9" fontFamily="monospace">friction</text>
+          <line x1="212" y1="0" x2="228" y2="0" stroke="#FBBF24" strokeWidth="3" strokeDasharray="4,2" />
+          <text x="232" y="3" fill="#CBD5E1" fontSize="9" fontFamily="monospace">resultant</text>
+          <text x="322" y="3" fill="#64748B" fontSize="8" fontFamily="monospace">arrow length ∝ force</text>
+        </g>
       </svg>
     </div>
   );

@@ -192,6 +192,28 @@ export function generateMomentsExamQuestions(seed = 1): ExamQuestion[] {
   const forceN = seededPick(seed, "moments-m1-force", [2.5, 3, 4]);
   const distanceM = seededPick(seed, "moments-m1-distance", [0.3, 0.4, 0.5]);
   const momentNm = forceN * distanceM;
+  const balance = seededPick(seed, "moments-m2-balance", [
+    { knownMass: 1.5, knownArm: 0.2, unknownArm: 0.3 },
+    { knownMass: 2, knownArm: 0.3, unknownArm: 0.2 },
+    { knownMass: 2.5, knownArm: 0.4, unknownArm: 0.25 },
+  ]);
+  const balancingMass = (balance.knownMass * balance.knownArm) / balance.unknownArm;
+  const ruleScenario = seededPick(seed, "moments-m3-rule", [
+    { ruleWeight: 1.2, pivot: 0.4, loadWeight: 0.8 },
+    { ruleWeight: 0.8, pivot: 0.3, loadWeight: 0.8 },
+    { ruleWeight: 0.8, pivot: 0.4, loadWeight: 1.6 },
+  ]);
+  const balancingPosition = ruleScenario.pivot - (ruleScenario.ruleWeight * (0.5 - ruleScenario.pivot)) / ruleScenario.loadWeight;
+  const angleForce = seededPick(seed, "moments-m4-force", [8, 10, 12]);
+  const angleLength = seededPick(seed, "moments-m4-length", [0.4, 0.5, 0.6]);
+  const forceAngle = seededPick(seed, "moments-m4-angle", [30, 45, 60]);
+  const angledMoment = angleForce * angleLength * Math.sin((forceAngle * Math.PI) / 180);
+  const unknownMassData = seededPick(seed, "moments-m6-data", [
+    { knownMass: 1.5, knownArm: 0.2, unknownArm: 0.3 },
+    { knownMass: 2, knownArm: 0.2, unknownArm: 0.4 },
+    { knownMass: 2.5, knownArm: 0.3, unknownArm: 0.5 },
+  ]);
+  const unknownMass = (unknownMassData.knownMass * unknownMassData.knownArm) / unknownMassData.unknownArm;
   return [
     {
       id: "m1",
@@ -216,16 +238,15 @@ export function generateMomentsExamQuestions(seed = 1): ExamQuestion[] {
       number: 2,
       marks: 2,
       paperRef: "0625/42 · Principle of moments",
-      prompt:
-        "A 2.0 kg mass sits 0.30 m to the left of a pivot. What mass, 0.20 m to the right, balances the beam? g = 9.8 N/kg.",
+      prompt: `A ${balance.knownMass.toFixed(1)} kg mass sits ${balance.knownArm.toFixed(2)} m to the left of a pivot. What mass, ${balance.unknownArm.toFixed(2)} m to the right, balances the beam? g = 9.8 N/kg.`,
       kind: "numeric",
-      expected: 3,
+      expected: balancingMass,
       unit: "kg",
       tolerancePct: 3,
       working: {
         equation: "m1 g d1 = m2 g d2  →  m2 = m1 d1 / d2",
-        substitution: "2.0 × 0.30 / 0.20 = 3.0",
-        answer: "3.00 kg",
+        substitution: `${balance.knownMass.toFixed(1)} × ${balance.knownArm.toFixed(2)} / ${balance.unknownArm.toFixed(2)} = ${balancingMass.toFixed(2)}`,
+        answer: `${balancingMass.toFixed(2)} kg`,
       },
       misconception: "g cancels. You can use masses × distances if both weights are mg.",
     },
@@ -234,17 +255,16 @@ export function generateMomentsExamQuestions(seed = 1): ExamQuestion[] {
       number: 3,
       marks: 2,
       paperRef: "0625/42 · Weight of a uniform rule",
-      prompt:
-        "A uniform metre rule of weight 1.2 N is pivoted at the 40 cm mark. Where (from the 0 cm end) must a 0.80 N load sit to balance? The rule’s weight acts at 50 cm.",
-      contextLines: ["Pivot = 0.40 m", "W_rule = 1.2 N at 0.50 m", "W_load = 0.80 N"],
+      prompt: `A uniform metre rule of weight ${ruleScenario.ruleWeight.toFixed(1)} N is pivoted at the ${Math.round(ruleScenario.pivot * 100)} cm mark. Where (from the 0 cm end) must a ${ruleScenario.loadWeight.toFixed(1)} N load sit to balance? The rule’s weight acts at 50 cm.`,
+      contextLines: [`Pivot = ${ruleScenario.pivot.toFixed(2)} m`, `W_rule = ${ruleScenario.ruleWeight.toFixed(1)} N at 0.50 m`, `W_load = ${ruleScenario.loadWeight.toFixed(1)} N`],
       kind: "numeric",
-      expected: 0.25,
+      expected: balancingPosition,
       unit: "m",
       tolerancePct: 4,
       working: {
-        equation: "1.2 × (0.50 − 0.40) = 0.80 × (0.40 − x)",
-        substitution: "0.12 = 0.80(0.40 − x) → x = 0.25",
-        answer: "0.250 m (the 25 cm mark)",
+        equation: `${ruleScenario.ruleWeight.toFixed(1)} × (0.50 − ${ruleScenario.pivot.toFixed(2)}) = ${ruleScenario.loadWeight.toFixed(1)} × (${ruleScenario.pivot.toFixed(2)} − x)`,
+        substitution: `${(ruleScenario.ruleWeight * (0.5 - ruleScenario.pivot)).toFixed(2)} = ${ruleScenario.loadWeight.toFixed(1)}(${ruleScenario.pivot.toFixed(2)} − x) → x = ${balancingPosition.toFixed(2)}`,
+        answer: `${balancingPosition.toFixed(3)} m (the ${Math.round(balancingPosition * 100)} cm mark)`,
       },
       misconception: "The rule’s own weight still produces a moment unless the pivot is at 50 cm.",
     },
@@ -253,17 +273,16 @@ export function generateMomentsExamQuestions(seed = 1): ExamQuestion[] {
       number: 4,
       marks: 2,
       paperRef: "0625/42 · Perpendicular distance",
-      prompt:
-        "A 10 N force acts at 0.50 m from a pivot, at 30° to the beam. Calculate the moment. moment = F × L × sinθ",
-      contextLines: ["F = 10 N", "L = 0.50 m", "θ = 30°"],
+      prompt: `A ${angleForce} N force acts at ${angleLength.toFixed(2)} m from a pivot, at ${forceAngle}° to the beam. Calculate the moment. moment = F × L × sinθ`,
+      contextLines: [`F = ${angleForce} N`, `L = ${angleLength.toFixed(2)} m`, `θ = ${forceAngle}°`],
       kind: "numeric",
-      expected: 2.5,
+      expected: angledMoment,
       unit: "N m",
       tolerancePct: 3,
       working: {
         equation: "moment = F L sinθ",
-        substitution: "10 × 0.50 × sin 30° = 5.0 × 0.50 = 2.50",
-        answer: "2.50 N m",
+        substitution: `${angleForce} × ${angleLength.toFixed(2)} × sin ${forceAngle}° = ${angledMoment.toFixed(2)}`,
+        answer: `${angledMoment.toFixed(2)} N m`,
       },
       misconception: "Do not use L itself unless the force is perpendicular (sin 90° = 1).",
     },
@@ -287,17 +306,16 @@ export function generateMomentsExamQuestions(seed = 1): ExamQuestion[] {
       number: 6,
       marks: 2,
       paperRef: "0625/42 · Unknown mass",
-      prompt:
-        "A 2.0 kg mass at 0.20 m left of a pivot balances an unknown mass at 0.40 m to the right. Find the unknown mass.",
-      contextLines: ["2.0 kg at 0.20 m ACW", "? kg at 0.40 m CW"],
+      prompt: `A ${unknownMassData.knownMass.toFixed(1)} kg mass at ${unknownMassData.knownArm.toFixed(2)} m left of a pivot balances an unknown mass at ${unknownMassData.unknownArm.toFixed(2)} m to the right. Find the unknown mass.`,
+      contextLines: [`${unknownMassData.knownMass.toFixed(1)} kg at ${unknownMassData.knownArm.toFixed(2)} m ACW`, `? kg at ${unknownMassData.unknownArm.toFixed(2)} m CW`],
       kind: "numeric",
-      expected: 1,
+      expected: unknownMass,
       unit: "kg",
       tolerancePct: 3,
       working: {
-        equation: "2.0 × 0.20 = m × 0.40",
-        substitution: "m = 0.40 / 0.40 = 1.0",
-        answer: "1.00 kg",
+        equation: `${unknownMassData.knownMass.toFixed(1)} × ${unknownMassData.knownArm.toFixed(2)} = m × ${unknownMassData.unknownArm.toFixed(2)}`,
+        substitution: `m = ${(unknownMassData.knownMass * unknownMassData.knownArm).toFixed(2)} / ${unknownMassData.unknownArm.toFixed(2)} = ${unknownMass.toFixed(2)}`,
+        answer: `${unknownMass.toFixed(2)} kg`,
       },
     },
   ];

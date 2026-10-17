@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Info, Zap } from "lucide-react";
 import { format3SF } from "@/lib/format";
-import type { CircuitEvaluation, CircuitState, PathComponent } from "./physics";
+import { evaluateCircuit, type CircuitEvaluation, type CircuitState, type PathComponent } from "./physics";
 
 export interface VISample {
   v: number;
@@ -13,6 +14,7 @@ interface Props {
   samples: VISample[];
   readings: RecordedReading[];
   onRecordReading: () => void;
+  onClearReadings: () => void;
 }
 
 export interface RecordedReading {
@@ -32,7 +34,14 @@ function collectLoads(state: CircuitState): PathComponent[] {
   return out;
 }
 
-export function CircuitReadouts({ evaluation, state, samples, readings, onRecordReading }: Props) {
+export function CircuitReadouts({
+  evaluation,
+  state,
+  samples,
+  readings,
+  onRecordReading,
+  onClearReadings,
+}: Props) {
   const loads = collectLoads(state);
   const badge = (() => {
     switch (evaluation.topology) {
@@ -88,23 +97,35 @@ export function CircuitReadouts({ evaluation, state, samples, readings, onRecord
           </span>
         )}
         <div className="mt-3 border-t border-border-faint pt-3">
-          <button
-            type="button"
-            onClick={onRecordReading}
-            disabled={!evaluation.isClosed || !Number.isFinite(evaluation.totalCurrent) || evaluation.totalCurrent <= 0}
-            className="min-h-10 rounded-lg border border-accent/40 px-3 text-xs font-semibold text-accent disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Record reading
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onRecordReading}
+              disabled={!evaluation.isClosed || !Number.isFinite(evaluation.totalCurrent) || evaluation.totalCurrent <= 0}
+              className="min-h-10 rounded-lg border border-accent/40 bg-accent/15 px-3 text-xs font-semibold text-accent hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Record reading
+            </button>
+            {readings.length > 0 && (
+              <button
+                type="button"
+                onClick={onClearReadings}
+                className="min-h-10 rounded-lg border border-border-subtle px-2.5 text-xs text-ink-muted hover:text-rose-300"
+              >
+                Clear table
+              </button>
+            )}
+          </div>
           {readings.length > 0 && (
             <div className="mt-2 overflow-x-auto">
               <table className="w-full text-left font-mono text-xs">
                 <thead className="text-[10px] text-ink-faint">
-                  <tr><th className="py-1 pr-2">V / V</th><th className="py-1 pr-2">I / A</th><th className="py-1">R / Ω</th></tr>
+                  <tr><th className="py-1 pr-2">#</th><th className="py-1 pr-2">V / V</th><th className="py-1 pr-2">I / A</th><th className="py-1">R / Ω</th></tr>
                 </thead>
                 <tbody>
                   {readings.map((reading, index) => (
                     <tr key={`${index}-${reading.voltage}`} className="border-t border-border-faint text-ink">
+                      <td className="py-1 pr-2 text-ink-faint">#{index + 1}</td>
                       <td className="py-1 pr-2">{format3SF(reading.voltage)}</td>
                       <td className="py-1 pr-2">{format3SF(reading.current)}</td>
                       <td className="py-1">{format3SF(reading.resistance)}</td>
@@ -146,7 +167,9 @@ export function CircuitReadouts({ evaluation, state, samples, readings, onRecord
                     <tr key={r.id} className="border-b border-border-faint text-ink">
                       <td className="py-1.5 pr-2 font-medium">{r.label}</td>
                       <td className="py-1.5 pr-2 font-mono text-cyan-300">
-                        {format3SF(r.kind === "lamp" && data && data.current > 0 ? data.voltage / data.current : r.value)}
+                        {r.kind === "diode"
+                          ? r.reversed ? "∞" : "0.50"
+                          : format3SF(r.kind === "lamp" && data && data.current > 0 ? data.voltage / data.current : r.value)}
                       </td>
                       <td className="py-1.5 pr-2 font-mono">{format3SF(data?.current ?? 0)}</td>
                       <td className="py-1.5 pr-2 font-mono font-semibold text-amber-300">
@@ -174,13 +197,13 @@ export function CircuitReadouts({ evaluation, state, samples, readings, onRecord
         )}
       </div>
 
-      <VIGraph samples={samples} state={state} />
+      <VIGraph samples={samples} state={state} readings={readings} />
 
-      <div className="flex flex-col gap-1.5 rounded-xl border border-border-faint bg-muted-bg p-3 text-xs text-ink-muted">
-        <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-accent">
+      <details className="rounded-xl border border-border-faint bg-muted-bg p-3 text-xs text-ink-muted">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-accent">
           <Info className="h-3.5 w-3.5" />
-          Cambridge exam rules
-        </div>
+          Cambridge exam rules (open for a reminder)
+        </summary>
         <ul className="list-disc space-y-1 pl-4 text-[11px]">
           <li>
             <strong className="text-ink">Ammeter</strong> — series only. Ideal resistance 0 Ω.
@@ -197,74 +220,141 @@ export function CircuitReadouts({ evaluation, state, samples, readings, onRecord
           <li>
             <strong className="text-ink">Open switch</strong> — I = 0. Voltmeter across the cell still reads E.
           </li>
+          <li>
+            <strong className="text-ink">Lamp model</strong> — simplified non-ohmic model: filament resistance rises with current; heating delay is omitted.
+          </li>
         </ul>
-      </div>
+      </details>
     </div>
   );
 }
 
-function VIGraph({ samples, state }: { samples: VISample[]; state: CircuitState }) {
-  const W = 320;
-  const H = 140;
-  const pl = 36;
-  const pb = 24;
-  const pr = 10;
-  const pt = 14;
-  const loads = collectLoads(state);
-  const resistor = loads.find((load) => load.kind === "resistor");
-  const lamp = loads.find((load) => load.kind === "lamp");
-  const vMax = Math.max(state.cellEmf, ...samples.map((s) => s.v), 1);
-  const iMax = Math.max(0.6, ...samples.map((s) => s.i), vMax / Math.max(1, resistor?.value ?? lamp?.value ?? 1));
+function VIGraph({
+  samples,
+  state,
+  readings,
+}: {
+  samples: VISample[];
+  state: CircuitState;
+  readings: RecordedReading[];
+}) {
+  const [showBestFit, setShowBestFit] = useState(false);
+  const W = 420, H = 272, pl = 54, pb = 48, pr = 14, pt = 16;
+  const curve = Array.from({ length: 41 }, (_, index) => evaluateCircuit({ ...state, cellEmf: (12 * index) / 40 }))
+    .filter((point) => point.isClosed && Number.isFinite(point.totalCurrent) && Number.isFinite(point.terminalV));
+  const allV = [
+    ...curve.map((p) => p.terminalV),
+    ...samples.map((s) => s.v),
+    ...readings.map((r) => r.voltage),
+  ];
+  const allI = [
+    ...curve.map((p) => p.totalCurrent),
+    ...samples.map((s) => s.i),
+    ...readings.map((r) => r.current),
+  ];
+  const vMax = Math.max(1, ...allV);
+  const iMax = Math.max(0.1, ...allI);
   const x = (v: number) => pl + (v / vMax) * (W - pl - pr);
   const y = (i: number) => H - pb - (i / iMax) * (H - pt - pb);
-  const pts = samples.map((s) => `${x(s.v).toFixed(1)},${y(s.i).toFixed(1)}`).join(" ");
-  const voltageSamples = Array.from({ length: 25 }, (_, index) => (vMax * index) / 24);
-  const resistorPoints = resistor
-    ? voltageSamples.map((voltage) => `${x(voltage).toFixed(1)},${y(voltage / resistor.value).toFixed(1)}`).join(" ")
-    : "";
-  const lampCurrentAtVoltage = (voltage: number) => {
-    if (!lamp) return 0;
-    let low = 0;
-    let high = Math.max(1, voltage / lamp.value);
-    for (let iteration = 0; iteration < 40; iteration += 1) {
-      const current = (low + high) / 2;
-      const drop = current * lamp.value * (1 + 2 * current * current);
-      if (drop < voltage) low = current;
-      else high = current;
+  const curvePoints = curve.map((point) => `${x(point.terminalV).toFixed(1)},${y(point.totalCurrent).toFixed(1)}`).join(" ");
+
+  // Linear regression on readings (I = slope * V + intercept)
+  let bestFit: { slope: number; intercept: number; rExp: number } | null = null;
+  if (readings.length >= 2) {
+    const n = readings.length;
+    const sumV = readings.reduce((acc, r) => acc + r.voltage, 0);
+    const sumI = readings.reduce((acc, r) => acc + r.current, 0);
+    const meanV = sumV / n;
+    const meanI = sumI / n;
+    const num = readings.reduce((acc, r) => acc + (r.voltage - meanV) * (r.current - meanI), 0);
+    const den = readings.reduce((acc, r) => acc + (r.voltage - meanV) ** 2, 0);
+    if (den > 1e-9) {
+      const slope = num / den; // dI / dV
+      const intercept = meanI - slope * meanV;
+      if (slope > 1e-6) {
+        bestFit = { slope, intercept, rExp: 1 / slope };
+      }
     }
-    return (low + high) / 2;
-  };
-  const lampPoints = lamp
-    ? voltageSamples.map((voltage) => `${x(voltage).toFixed(1)},${y(lampCurrentAtVoltage(voltage)).toFixed(1)}`).join(" ")
-    : "";
+  }
 
   return (
     <div className="rounded-xl border border-border-subtle bg-surface p-3">
-      <p className="font-mono text-xs font-bold uppercase tracking-widest text-accent">V–I graph (Ohm’s law)</p>
-      <p className="mt-0.5 text-[10px] text-ink-faint">
-        Resistor: straight line · lamp: curved I–V response
-      </p>
-      <div className="mt-1 flex gap-3 font-mono text-[10px]">
-        {resistor && <span className="text-cyan-300">━ resistor</span>}
-        {lamp && <span className="text-violet-300">━ lamp</span>}
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 h-auto w-full">
+      <p className="font-mono text-xs font-bold uppercase tracking-widest text-accent">Whole-circuit current–voltage graph</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-ink-muted">Current I against terminal potential difference V. The curve includes every component in this circuit.</p>
+      <svg role="img" aria-label="Whole circuit current against terminal potential difference graph" viewBox={`0 0 ${W} ${H}`} className="mt-2 h-auto w-full">
         <rect width={W} height={H} fill="#0E1017" rx="8" />
-        <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#334155" />
-        <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#334155" />
-        {resistorPoints && <polyline fill="none" stroke="#22D3EE" strokeWidth="1.8" points={resistorPoints} />}
-        {lampPoints && <polyline fill="none" stroke="#A78BFA" strokeWidth="2" points={lampPoints} />}
-        {pts && <polyline fill="none" stroke="#F59E0B" strokeWidth="2" points={pts} />}
-        {samples.map((s, idx) => (
-          <circle key={`${s.v}-${idx}`} cx={x(s.v)} cy={y(s.i)} r="2.4" fill="#FBBF24" />
+        {[0, 1, 2, 3, 4].map((n) => {
+          const yy = H - pb - ((H - pt - pb) * n) / 4;
+          const xx = pl + ((W - pl - pr) * n) / 4;
+          return <g key={n}>
+            <line x1={pl} y1={yy} x2={W - pr} y2={yy} stroke="#263244" />
+            <line x1={xx} y1={pt} x2={xx} y2={H - pb} stroke="#263244" />
+            <text x={pl - 7} y={yy + 4} fill="#CBD5E1" textAnchor="end" fontSize="11" fontFamily="monospace">{(iMax * n / 4).toFixed(2)}</text>
+            <text x={n === 0 ? xx + 5 : xx} y={H - 27} fill="#CBD5E1" textAnchor={n === 0 ? "start" : "middle"} fontSize="11" fontFamily="monospace">{(vMax * n / 4).toFixed(1)}</text>
+          </g>;
+        })}
+        <line x1={pl} y1={pt} x2={pl} y2={H - pb} stroke="#64748B" />
+        <line x1={pl} y1={H - pb} x2={W - pr} y2={H - pb} stroke="#64748B" />
+        {curvePoints && <polyline fill="none" stroke="#22D3EE" strokeWidth="3" points={curvePoints} />}
+        {showBestFit && bestFit && (
+          <line
+            x1={x(0)}
+            y1={y(Math.max(0, bestFit.intercept))}
+            x2={x(vMax)}
+            y2={y(Math.max(0, bestFit.slope * vMax + bestFit.intercept))}
+            stroke="#10B981"
+            strokeWidth="2.2"
+            strokeDasharray="5 3"
+          />
+        )}
+        {readings.map((r, index) => (
+          <g key={`reading-${index}-${r.voltage}`}>
+            <circle cx={x(r.voltage)} cy={y(r.current)} r="5" fill="#F59E0B" stroke="#0E1017" strokeWidth="1.5" />
+            <text x={x(r.voltage) + 7} y={y(r.current) - 4} fill="#FCD34D" fontSize="8" fontFamily="monospace">
+              #{index + 1}
+            </text>
+          </g>
         ))}
-        <text x={8} y={12} fill="#64748B" fontSize="8" fontFamily="monospace">
-          I / A
-        </text>
-        <text x={W - 8} y={H - 6} textAnchor="end" fill="#64748B" fontSize="8" fontFamily="monospace">
-          V / V
-        </text>
+        {samples.length > 0 && (
+          <circle
+            cx={x(samples[samples.length - 1].v)}
+            cy={y(samples[samples.length - 1].i)}
+            r="6"
+            fill="none"
+            stroke="#38BDF8"
+            strokeWidth="2"
+            strokeDasharray="2 2"
+          />
+        )}
+        <text x={pl} y={12} fill="#E2E8F0" fontSize="12" fontFamily="monospace">I (A)</text>
+        <text x={W - pr} y={H - 5} textAnchor="end" fill="#E2E8F0" fontSize="12" fontFamily="monospace">Terminal p.d. V (V)</text>
       </svg>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border-faint pt-2 text-xs">
+        <button
+          type="button"
+          onClick={() => setShowBestFit((s) => !s)}
+          className={`rounded-lg border px-2.5 py-1 font-mono text-[11px] transition ${
+            showBestFit
+              ? "border-emerald-500 bg-emerald-950/40 text-emerald-200"
+              : "border-border-subtle bg-muted-bg text-ink-muted hover:border-emerald-500 hover:text-emerald-300"
+          }`}
+        >
+          {showBestFit ? "Hide best-fit line" : "Best-fit line (Paper 6)"}
+        </button>
+        {showBestFit && bestFit ? (
+          <span className="font-mono text-[11px] text-emerald-300">
+            Gradient ΔI/ΔV = {format3SF(bestFit.slope)} A/V → <strong className="text-white">R = ΔV/ΔI = {format3SF(bestFit.rExp)} Ω</strong>
+          </span>
+        ) : showBestFit && readings.length < 2 ? (
+          <span className="font-mono text-[10px] text-amber-300/80">
+            Record ≥ 2 readings at different V to calculate best-fit gradient
+          </span>
+        ) : (
+          <span className="text-[10px] text-ink-faint">
+            Cyan curve: theoretical circuit response · Amber dots: recorded readings
+          </span>
+        )}
+      </div>
     </div>
   );
 }

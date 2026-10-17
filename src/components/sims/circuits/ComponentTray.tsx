@@ -20,7 +20,9 @@ const PARTS: Array<{
 }> = [
   { type: "resistor_10", badge: "10 Ω", label: "Resistor", hint: "Tap to add in series" },
   { type: "resistor_20", badge: "20 Ω", label: "Resistor", hint: "Tap to add in series" },
+  { type: "variable_resistor", badge: "VR 15Ω", label: "Variable R", hint: "Adjustable 0–40 Ω" },
   { type: "lamp", badge: "12 Ω", label: "Lamp", hint: "Glows with current" },
+  { type: "diode", badge: "Diode", label: "Diode", hint: "Conducts 1-way" },
   { type: "ammeter", badge: "A", label: "Ammeter", hint: "Series · 0 Ω" },
 ];
 
@@ -41,7 +43,7 @@ export function ComponentTray({
           {selected === "voltmeter" ? "Now clip V on the schematic" : "Tap a part to add it"}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
         <div className="flex flex-col justify-center rounded-lg border border-accent/40 bg-accent/10 p-2">
           <div className="mb-1 flex items-center justify-center gap-1">
             <Battery className="h-3.5 w-3.5 text-accent" />

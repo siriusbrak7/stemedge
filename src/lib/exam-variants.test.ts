@@ -55,3 +55,31 @@ test("seeded prompts, contexts, expected results and substitutions agree", () =>
   assert.equal(values?.length, 3);
   assert.equal(electromagnetism.expected, values![0] * values![1] * values![2]);
 });
+
+test("every numeric question has seeded answer variants", () => {
+  const generators = [
+    generateForcesExamQuestions,
+    generateMomentsExamQuestions,
+    generateFloatingExamQuestions,
+    generateCircuitsExamQuestions,
+    generateRefractionExamQuestions,
+    generateElectromagnetismExamQuestions,
+  ];
+  for (const generate of generators) {
+    const attempts = Array.from({ length: 24 }, (_, index) => generate(700 + index));
+    const numericIds = attempts[0].filter((question) => question.kind === "numeric").map((question) => question.id);
+    for (const id of numericIds) {
+      const variants = new Set(
+        attempts.map((questions) => questions.find((question) => question.id === id)?.expected),
+      );
+      const scenarios = new Set(
+        attempts.map((questions) => {
+          const question = questions.find((item) => item.id === id);
+          return `${question?.prompt} ${question?.contextLines?.join(" ") ?? ""}`;
+        }),
+      );
+      assert.ok(scenarios.size > 1, `${id} should have seeded scenario variants`);
+      if (id !== "e6") assert.ok(variants.size > 1, `${id} should have seeded answer variants`);
+    }
+  }
+});

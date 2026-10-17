@@ -2,14 +2,15 @@ import type { ExamQuestion } from "@/components/ExamPlayer";
 import { format3SF } from "../../../lib/format.ts";
 import { seededPick } from "../../../lib/seeded-choice.ts";
 
-export type PathKind = "resistor" | "ammeter" | "lamp";
-export type TrayType = "resistor_10" | "resistor_20" | "lamp" | "ammeter" | "voltmeter";
+export type PathKind = "resistor" | "ammeter" | "lamp" | "variable_resistor" | "diode";
+export type TrayType = "resistor_10" | "resistor_20" | "variable_resistor" | "lamp" | "diode" | "ammeter" | "voltmeter";
 
 export interface PathComponent {
   id: string;
   kind: PathKind;
   value: number;
   label: string;
+  reversed?: boolean;
 }
 
 export type Section =
@@ -21,7 +22,7 @@ export interface CircuitState {
   internalR: number;
   switchClosed: boolean;
   sections: Section[];
-  voltmeterAcross: string | "supply" | null;
+  voltmeterAcross: string | "supply" | "switch" | null;
 }
 
 export type Topology =
@@ -75,6 +76,13 @@ export interface GuidedTask {
   title: string;
   prompt: string;
   goal: string;
+  prediction: {
+    question: string;
+    choices: string[];
+    answer: number;
+    explanation: string;
+  };
+  setupFactory: () => CircuitState;
 }
 
 export const GUIDED_TASKS: GuidedTask[] = [
@@ -84,6 +92,23 @@ export const GUIDED_TASKS: GuidedTask[] = [
     prompt:
       "Tap the 10 Ω resistor in the tray — it drops onto the loop. Keep the switch closed. Check I = V / R for the whole circuit.",
     goal: "Closed series circuit with at least one load.",
+    prediction: {
+      question: "With a resistor in the loop and the switch closed, current will…",
+      choices: ["flow", "not flow"],
+      answer: 0,
+      explanation:
+        "Closing the switch provides a complete conducting path with a finite resistance (10 Ω). By Ohm's law I = V/R = 6/10 = 0.6 A flows.",
+    },
+    setupFactory: () => {
+      const r1 = componentFromTray("resistor_10", 1);
+      return {
+        cellEmf: 6,
+        internalR: 0,
+        switchClosed: true,
+        sections: [{ id: makeId("s"), type: "series", component: r1 }],
+        voltmeterAcross: null,
+      };
+    },
   },
   {
     id: 2,
@@ -91,6 +116,27 @@ export const GUIDED_TASKS: GuidedTask[] = [
     prompt:
       "Add the 20 Ω as well. Current is the same through both. The p.d.s add to the terminal voltage. Read V on each resistor.",
     goal: "Two loads in series, switch closed.",
+    prediction: {
+      question: "Adding a second resistor in series makes total current…",
+      choices: ["decrease", "stay the same", "increase"],
+      answer: 0,
+      explanation:
+        "Resistances add in series (R_tot = R1 + R2 = 30 Ω). A greater total resistance opposes current flow, decreasing total current from 0.60 A to 0.20 A.",
+    },
+    setupFactory: () => {
+      const r1 = componentFromTray("resistor_10", 1);
+      const r2 = componentFromTray("resistor_20", 2);
+      return {
+        cellEmf: 6,
+        internalR: 0,
+        switchClosed: true,
+        sections: [
+          { id: makeId("s"), type: "series", component: r1 },
+          { id: makeId("s"), type: "series", component: r2 },
+        ],
+        voltmeterAcross: null,
+      };
+    },
   },
   {
     id: 3,
@@ -98,6 +144,29 @@ export const GUIDED_TASKS: GuidedTask[] = [
     prompt:
       "Add the ammeter (it must sit in the loop — series). Then tap the voltmeter and clip it across a resistor. Voltmeters never go in the chain.",
     goal: "Ammeter in series and voltmeter across a load.",
+    prediction: {
+      question: "An ideal ammeter in series changes the current…",
+      choices: ["not at all", "by a lot", "to zero"],
+      answer: 0,
+      explanation:
+        "An ideal ammeter has negligible resistance (≈ 0 Ω). Placing it in series measures the through-current without impeding the flow of charge.",
+    },
+    setupFactory: () => {
+      const a = componentFromTray("ammeter");
+      const r1 = componentFromTray("resistor_10", 1);
+      const r2 = componentFromTray("resistor_20", 2);
+      return {
+        cellEmf: 6,
+        internalR: 0,
+        switchClosed: true,
+        sections: [
+          { id: makeId("s"), type: "series", component: a },
+          { id: makeId("s"), type: "series", component: r1 },
+          { id: makeId("s"), type: "series", component: r2 },
+        ],
+        voltmeterAcross: r1.id,
+      };
+    },
   },
   {
     id: 4,
@@ -105,6 +174,28 @@ export const GUIDED_TASKS: GuidedTask[] = [
     prompt:
       "On a resistor, tap “add in parallel”, then add the other resistor on the new branch. Combined R is smaller than either branch. Currents add.",
     goal: "Two resistor branches in parallel, circuit closed.",
+    prediction: {
+      question: "Adding a parallel branch makes the cell’s total current…",
+      choices: ["increase", "decrease", "stay the same"],
+      answer: 0,
+      explanation:
+        "Adding a parallel branch provides an additional conducting path (1/R_tot = 1/R1 + 1/R2). The combined resistance drops to 6.67 Ω, so the cell delivers more total current.",
+    },
+    setupFactory: () => {
+      const a = componentFromTray("ammeter");
+      const r1 = componentFromTray("resistor_10", 1);
+      const r2 = componentFromTray("resistor_20", 2);
+      return {
+        cellEmf: 6,
+        internalR: 0,
+        switchClosed: true,
+        sections: [
+          { id: makeId("s"), type: "series", component: a },
+          { id: makeId("p"), type: "parallel", branches: [[r1], [r2]] },
+        ],
+        voltmeterAcross: null,
+      };
+    },
   },
 ];
 
@@ -124,6 +215,12 @@ export function componentFromTray(
   }
   if (type === "resistor_20") {
     return { id: makeId("R"), kind: "resistor", value: 20, label: `R${serial} · 20 Ω` };
+  }
+  if (type === "variable_resistor") {
+    return { id: makeId("VR"), kind: "variable_resistor", value: 15, label: `VR${serial} · 15 Ω` };
+  }
+  if (type === "diode") {
+    return { id: makeId("D"), kind: "diode", value: 0.5, label: `D${serial} · Diode`, reversed: false };
   }
   return { id: makeId("R"), kind: "resistor", value: 10, label: `R${serial} · 10 Ω` };
 }
@@ -170,11 +267,13 @@ export function loadParallelDemo(): CircuitState {
 }
 
 function isLoad(c: PathComponent): boolean {
-  return c.kind === "resistor" || c.kind === "lamp";
+  return c.kind === "resistor" || c.kind === "lamp" || c.kind === "variable_resistor" || c.kind === "diode";
 }
 
 function resistanceOf(c: PathComponent): number {
-  return c.kind === "ammeter" ? 0 : c.value;
+  if (c.kind === "ammeter") return 0;
+  if (c.kind === "diode") return c.reversed ? Infinity : 0.5;
+  return c.value;
 }
 
 function branchResistance(branch: PathComponent[]): number {
@@ -192,6 +291,7 @@ function sectionResistance(section: Section): number {
   return 1 / recip;
 }
 
+// k = 2 A⁻² in R = R₀(1 + kI²); illustrative steady-state filament model.
 export const LAMP_TEMP_COEFFICIENT = 2;
 
 export function lampResistanceAtCurrent(baseResistance: number, currentA: number): number {
@@ -219,16 +319,18 @@ function parallelBranchCurrents(section: Extract<Section, { type: "parallel" }>,
       Number.isFinite(resistance) && resistance > 0 ? 1 / resistance : resistance === 0 ? Infinity : 0,
     ) as [number, number];
     const next: [number, number] =
-      conductances[0] === Infinity
-        ? [totalCurrent, 0]
-        : conductances[1] === Infinity
-          ? [0, totalCurrent]
-          : conductances[0] + conductances[1] > 0
-            ? [
-                totalCurrent * (conductances[0] / (conductances[0] + conductances[1])),
-                totalCurrent * (conductances[1] / (conductances[0] + conductances[1])),
-              ]
-            : [0, 0];
+      conductances[0] === Infinity && conductances[1] === Infinity
+        ? [totalCurrent / 2, totalCurrent / 2]
+        : conductances[0] === Infinity
+          ? [totalCurrent, 0]
+          : conductances[1] === Infinity
+            ? [0, totalCurrent]
+            : conductances[0] + conductances[1] > 0
+              ? [
+                  totalCurrent * (conductances[0] / (conductances[0] + conductances[1])),
+                  totalCurrent * (conductances[1] / (conductances[0] + conductances[1])),
+                ]
+              : [0, 0];
     const settled: [number, number] = [
       currents[0] * 0.5 + next[0] * 0.5,
       currents[1] * 0.5 + next[1] * 0.5,
@@ -262,25 +364,18 @@ function loadResistanceAtCurrent(state: CircuitState, currentA: number): number 
   );
 }
 
-function hasLoad(state: CircuitState): boolean {
-  return state.sections.some((sec) => {
-    if (sec.type === "series") return isLoad(sec.component);
-    return sec.branches.some((b) => b.some(isLoad));
-  });
-}
-
-function countSeriesLoads(state: CircuitState): number {
-  return state.sections.filter((s) => s.type === "series" && isLoad(s.component)).length;
+function countSeriesResistors(state: CircuitState): number {
+  return state.sections.filter((s) => s.type === "series" && s.component.kind === "resistor").length;
 }
 
 function hasSeriesAmmeter(state: CircuitState): boolean {
   return state.sections.some((sec) => sec.type === "series" && sec.component.kind === "ammeter");
 }
 
-function parallelLoadPair(state: CircuitState): boolean {
+function parallelResistorPair(state: CircuitState): boolean {
   return state.sections.some((sec) => {
     if (sec.type !== "parallel") return false;
-    return sec.branches[0].some(isLoad) && sec.branches[1].some(isLoad);
+    return sec.branches[0].some((c) => c.kind === "resistor") && sec.branches[1].some((c) => c.kind === "resistor");
   });
 }
 
@@ -312,9 +407,8 @@ function hasZeroResistanceParallelBranch(state: CircuitState): boolean {
   );
 }
 
-export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
+export function evaluateCircuit(state: CircuitState, currentTaskId = 1): CircuitEvaluation {
   const empty = state.sections.length === 0;
-  const loadsPresent = hasLoad(state);
   let rLoad = loadResistanceOf(state);
   const steps: string[] = [];
 
@@ -337,10 +431,10 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
 
   const switchOpen = !state.switchClosed;
   const parallelShort = hasZeroResistanceParallelBranch(state);
-  const isShort = state.switchClosed && !empty && (!loadsPresent || parallelShort);
+  const isShort = state.switchClosed && !empty && (parallelShort || (Number.isFinite(rLoad) && rLoad <= 0.001));
   const rInternal = Math.max(0, state.internalR);
   let rTotalIfClosed = (Number.isFinite(rLoad) ? rLoad : 0) + rInternal;
-  const isClosed = state.switchClosed && loadsPresent && Number.isFinite(rLoad) && rLoad > 0.001 && !parallelShort;
+  const isClosed = state.switchClosed && Number.isFinite(rLoad) && rLoad > 0.001 && !parallelShort;
 
   let totalCurrent = 0;
   if (switchOpen) {
@@ -370,9 +464,7 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
       ? rInternal > 0.001
         ? 0
         : 0
-      : isClosed
-        ? state.cellEmf - totalCurrent * rInternal
-        : 0;
+      : state.cellEmf - totalCurrent * rInternal;
 
   if (isClosed) {
     steps.push(
@@ -435,6 +527,9 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
   if (state.voltmeterAcross === "supply") {
     voltmeterWhere = "cell terminals";
     voltmeterReading = terminalV;
+  } else if (state.voltmeterAcross === "switch") {
+    voltmeterWhere = "across switch";
+    voltmeterReading = switchOpen ? state.cellEmf : 0;
   } else if (state.voltmeterAcross) {
     const target = allComponents(state).find((c) => c.id === state.voltmeterAcross);
     if (target && isLoad(target)) {
@@ -447,8 +542,8 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
   }
 
   const hasParallel = state.sections.some((s) => s.type === "parallel");
-  const seriesLoadN = countSeriesLoads(state);
-  const hasSeriesLoad = seriesLoadN >= 1;
+  const seriesLoadN = state.sections.filter((s) => s.type === "series" && isLoad(s.component)).length;
+  const hasSeriesLoad = seriesLoadN > 0;
 
   let topology: Topology;
   if (switchOpen) topology = "Switch open";
@@ -459,15 +554,21 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
   else if (hasParallel) topology = "Parallel (closed)";
   else topology = "Series (closed)";
 
-  const task1 = isClosed;
+  const task1 = isClosed && !hasParallel && hasSeriesLoad;
   const task2 = isClosed && !hasParallel && seriesLoadN >= 2;
+  const voltmeterTarget = state.voltmeterAcross && state.voltmeterAcross !== "supply" && state.voltmeterAcross !== "switch"
+    ? allComponents(state).find((component) => component.id === state.voltmeterAcross)
+    : undefined;
   const task3 =
     isClosed &&
     hasSeriesAmmeter(state) &&
-    state.voltmeterAcross !== null &&
-    state.voltmeterAcross !== "supply" &&
-    Boolean(resistorCurrents[state.voltmeterAcross]);
-  const task4 = isClosed && parallelLoadPair(state);
+    voltmeterTarget !== undefined &&
+    isLoad(voltmeterTarget) &&
+    Boolean(resistorCurrents[voltmeterTarget.id]);
+  const task4 = isClosed && state.sections.some((sec) => {
+    if (sec.type !== "parallel") return false;
+    return sec.branches[0].some(isLoad) && sec.branches[1].some(isLoad);
+  });
 
   let coach: string;
   if (empty && switchOpen) {
@@ -476,23 +577,26 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
     coach = "Tap the 10 Ω resistor in the tray — it drops onto the top rail. The cell is already in the loop.";
   } else if (switchOpen) {
     coach =
-      "Switch is open, so I = 0. A voltmeter across the cell still reads the e.m.f. Across a resistor it reads 0.";
+      state.voltmeterAcross === "switch"
+        ? "Voltmeter across the open switch reads the full cell e.m.f. because the meter's huge resistance completes the probe circuit with negligible current."
+        : "Switch is open, so I = 0. A voltmeter across the cell or an open switch reads the e.m.f. Across a load it reads 0.";
   } else if (isShort) {
     coach = parallelShort
       ? "An ammeter in parallel is a short circuit; ammeters go in series."
       : "There is no load — this is a short circuit. Current would be huge (limited only by internal resistance). Add a resistor or lamp.";
   } else if (!isClosed) {
-    coach = "The conducting path is incomplete. Add a resistor to each open branch.";
-  } else if (!task2 && !task4) {
-    coach = `Loop closed. I = ${format3SF(totalCurrent)} A. Add a second resistor in series, or put one in parallel.`;
-  } else if (ammeterReading === null) {
-    coach = "Insert the ammeter in the loop (series). An ideal ammeter is 0 Ω, so the current must not change.";
-  } else if (!task3) {
-    coach = "Ammeter is in series. Tap V, then clip it across a resistor (not the cell) to see V = IR.";
-  } else if (!task4) {
-    coach = "Meters are placed. On a resistor, tap “add in parallel”, then add the 20 Ω on the new branch.";
+    const reverseDiode = allComponents(state).find((c) => c.kind === "diode" && c.reversed);
+    coach = reverseDiode
+      ? "The diode is reverse-biased and blocks conventional current (infinite resistance). Tap ⇄ Flip on the diode to allow forward conduction."
+      : "The conducting path is incomplete. Add a resistor or lamp to each open branch.";
+  } else if (currentTaskId === 1) {
+    coach = task1 ? "The loop is complete. Predict I = E/R, then add an ammeter in series to check your calculation." : "Add a load in the series path and close the switch to complete this task.";
+  } else if (currentTaskId === 2) {
+    coach = task2 ? "Both loads are in series: current is equal through them and their p.d.s add." : "Add a second load (resistor or lamp) in series with the switch closed.";
+  } else if (currentTaskId === 3) {
+    coach = task3 ? "The ammeter is in series and the voltmeter is across a load. Compare the readings with V = IR." : ammeterReading === null ? "Place the ammeter in the main series path; an ideal ammeter has negligible resistance." : "Select the voltmeter, then clip it across a load (not along the circuit).";
   } else {
-    coach = "Lab goals complete. Drag the e.m.f. slider — a metallic resistor gives a straight V–I line through the origin.";
+    coach = task4 ? "Both parallel branches contain loads. Compare branch current with total current." : "Split a component into parallel branches, then place a resistor or lamp in each branch.";
   }
 
   const ammeterHint = hasParallel
@@ -527,7 +631,7 @@ export function evaluateCircuit(state: CircuitState): CircuitEvaluation {
     branchCurrents,
     componentCurrent,
     seriesResistorCount: seriesLoadN,
-    parallelResistorPair: parallelLoadPair(state),
+    parallelResistorPair: parallelResistorPair(state),
     voltagesSum,
     task1Complete: task1,
     task2Complete: task2,
@@ -550,6 +654,29 @@ export function generateCircuitsExamQuestions(seed = 1): ExamQuestion[] {
   const emf = seededPick(seed, "circuits-c1-emf", [4.5, 6, 7.5]);
   const resistance = seededPick(seed, "circuits-c1-resistance", [10, 15, 20]);
   const current = emf / resistance;
+  const series = seededPick(seed, "circuits-c2-series", [
+    { r1: 10, r2: 20, emf: 6 },
+    { r1: 12, r2: 24, emf: 7.5 },
+    { r1: 15, r2: 30, emf: 9 },
+  ]);
+  const seriesCurrent = series.emf / (series.r1 + series.r2);
+  const secondResistorVoltage = seriesCurrent * series.r2;
+  const parallel = seededPick(seed, "circuits-c4-parallel", [
+    { r1: 10, r2: 20 },
+    { r1: 12, r2: 24 },
+    { r1: 15, r2: 30 },
+  ]);
+  const parallelResistance = 1 / (1 / parallel.r1 + 1 / parallel.r2);
+  const openEmf = seededPick(seed, "circuits-c5-emf", [4.5, 6, 9]);
+  const powerVoltage = seededPick(seed, "circuits-c7-voltage", [4.5, 6, 9]);
+  const powerCurrent = seededPick(seed, "circuits-c7-current", [0.4, 0.6, 0.8]);
+  const power = powerVoltage * powerCurrent;
+  const branchCircuit = seededPick(seed, "circuits-c8-branch", [
+    { resistance: 10, other: 20, voltage: 4.5 },
+    { resistance: 12, other: 24, voltage: 6 },
+    { resistance: 15, other: 30, voltage: 9 },
+  ]);
+  const branchCurrent = branchCircuit.voltage / branchCircuit.resistance;
   return [
     {
       id: "c1",
@@ -574,15 +701,16 @@ export function generateCircuitsExamQuestions(seed = 1): ExamQuestion[] {
       number: 2,
       marks: 2,
       paperRef: "0625/41 · Series",
-      prompt: "Two resistors, 10 Ω and 20 Ω, are in series with a 6.0 V cell. Calculate the current.",
+      prompt: `Two resistors, ${series.r1} Ω and ${series.r2} Ω, are in series with a ${series.emf.toFixed(1)} V cell. Calculate the current.`,
+      contextLines: [`R₁ = ${series.r1} Ω`, `R₂ = ${series.r2} Ω`, `E = ${series.emf.toFixed(1)} V`],
       kind: "numeric",
-      expected: 0.2,
+      expected: seriesCurrent,
       unit: "A",
       tolerancePct: 2,
       working: {
         equation: "R_tot = R1 + R2 ; I = V / R_tot",
-        substitution: "30 Ω ; 6.0 / 30 = 0.20",
-        answer: "0.200 A",
+        substitution: `${series.r1 + series.r2} Ω ; ${series.emf.toFixed(1)} / ${series.r1 + series.r2} = ${seriesCurrent.toFixed(3)}`,
+        answer: `${seriesCurrent.toFixed(3)} A`,
       },
       misconception: "In series you add resistances, you do not add currents.",
     },
@@ -591,15 +719,16 @@ export function generateCircuitsExamQuestions(seed = 1): ExamQuestion[] {
       number: 3,
       marks: 2,
       paperRef: "0625/41 · Series p.d.",
-      prompt: "Using the circuit in Q2, calculate the p.d. across the 20 Ω resistor.",
+      prompt: `Using the circuit in Q2, calculate the p.d. across the ${series.r2} Ω resistor.`,
+      contextLines: [`I = ${seriesCurrent.toFixed(3)} A`, `R = ${series.r2} Ω`],
       kind: "numeric",
-      expected: 4,
+      expected: secondResistorVoltage,
       unit: "V",
       tolerancePct: 2,
       working: {
         equation: "V = IR",
-        substitution: "0.20 × 20 = 4.0",
-        answer: "4.00 V",
+        substitution: `${seriesCurrent.toFixed(3)} × ${series.r2} = ${secondResistorVoltage.toFixed(2)}`,
+        answer: `${secondResistorVoltage.toFixed(2)} V`,
       },
       misconception: "p.d. splits in series in proportion to resistance — not equally.",
     },
@@ -608,15 +737,16 @@ export function generateCircuitsExamQuestions(seed = 1): ExamQuestion[] {
       number: 4,
       marks: 2,
       paperRef: "0625/41 · Parallel",
-      prompt: "A 10 Ω and a 20 Ω resistor are in parallel. Calculate the combined resistance.",
+      prompt: `A ${parallel.r1} Ω and a ${parallel.r2} Ω resistor are in parallel. Calculate the combined resistance.`,
+      contextLines: [`R₁ = ${parallel.r1} Ω`, `R₂ = ${parallel.r2} Ω`],
       kind: "numeric",
-      expected: 6.67,
+      expected: parallelResistance,
       unit: "Ω",
       tolerancePct: 2.5,
       working: {
         equation: "1/R = 1/R1 + 1/R2",
-        substitution: "1/10 + 1/20 = 0.15 → R = 6.67",
-        answer: "6.67 Ω",
+        substitution: `1/${parallel.r1} + 1/${parallel.r2} → R = ${parallelResistance.toFixed(2)}`,
+        answer: `${parallelResistance.toFixed(2)} Ω`,
       },
       misconception: "Combined parallel resistance is smaller than the smallest branch.",
     },
@@ -626,16 +756,16 @@ export function generateCircuitsExamQuestions(seed = 1): ExamQuestion[] {
       marks: 2,
       paperRef: "0625/41 · Open switch",
       prompt:
-        "A voltmeter is connected across the terminals of a 6.0 V cell. The switch in the loop is open. What does the voltmeter read?",
-      contextLines: ["E = 6.0 V", "switch open → I = 0"],
+        `A voltmeter is connected across the terminals of a ${openEmf.toFixed(1)} V cell. The switch in the loop is open. What does the voltmeter read?`,
+      contextLines: [`E = ${openEmf.toFixed(1)} V`, "switch open → I = 0"],
       kind: "numeric",
-      expected: 6,
+      expected: openEmf,
       unit: "V",
       tolerancePct: 2,
       working: {
         equation: "I = 0 so Ir = 0 ; V_terminal = E",
-        substitution: "V = 6.0",
-        answer: "6.00 V",
+        substitution: `V = ${openEmf.toFixed(1)}`,
+        answer: `${openEmf.toFixed(2)} V`,
       },
       misconception: "An open switch does not make the cell’s e.m.f. vanish. Current is zero; the voltmeter across the cell still reads E.",
     },
@@ -660,16 +790,16 @@ export function generateCircuitsExamQuestions(seed = 1): ExamQuestion[] {
       number: 7,
       marks: 2,
       paperRef: "0625/41 · Power",
-      prompt: "A 6.0 V cell supplies 0.60 A to a resistor. Calculate the power transferred in the resistor.",
-      contextLines: ["V = 6.0 V", "I = 0.60 A"],
+      prompt: `A ${powerVoltage.toFixed(1)} V cell supplies ${powerCurrent.toFixed(2)} A to a resistor. Calculate the power transferred in the resistor.`,
+      contextLines: [`V = ${powerVoltage.toFixed(1)} V`, `I = ${powerCurrent.toFixed(2)} A`],
       kind: "numeric",
-      expected: 3.6,
+      expected: power,
       unit: "W",
       tolerancePct: 2,
       working: {
         equation: "P = IV",
-        substitution: "0.60 × 6.0 = 3.6",
-        answer: "3.60 W",
+        substitution: `${powerCurrent.toFixed(2)} × ${powerVoltage.toFixed(1)} = ${power.toFixed(2)}`,
+        answer: `${power.toFixed(2)} W`,
       },
       misconception: "Power is IV (or I²R or V²/R), not I/V.",
     },
@@ -678,15 +808,16 @@ export function generateCircuitsExamQuestions(seed = 1): ExamQuestion[] {
       number: 8,
       marks: 2,
       paperRef: "0625/41 · Parallel current",
-      prompt: "A 10 Ω and a 20 Ω resistor in parallel are connected to 6.0 V. Calculate the current in the 10 Ω branch.",
+      prompt: `A ${branchCircuit.resistance} Ω and a ${branchCircuit.other} Ω resistor in parallel are connected to ${branchCircuit.voltage.toFixed(1)} V. Calculate the current in the ${branchCircuit.resistance} Ω branch.`,
+      contextLines: [`V = ${branchCircuit.voltage.toFixed(1)} V`, `R_branch = ${branchCircuit.resistance} Ω`],
       kind: "numeric",
-      expected: 0.6,
+      expected: branchCurrent,
       unit: "A",
       tolerancePct: 2,
       working: {
         equation: "I = V / R  (same V on each branch)",
-        substitution: "6.0 / 10 = 0.60",
-        answer: "0.600 A",
+        substitution: `${branchCircuit.voltage.toFixed(1)} / ${branchCircuit.resistance} = ${branchCurrent.toFixed(3)}`,
+        answer: `${branchCurrent.toFixed(3)} A`,
       },
       misconception: "In parallel the p.d. is the same; current is not.",
     },

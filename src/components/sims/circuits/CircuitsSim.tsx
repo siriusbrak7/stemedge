@@ -41,8 +41,9 @@ export function CircuitsSim({ onBackToHome }: Props) {
   const [samples, setSamples] = useState<VISample[]>([]);
   const [readings, setReadings] = useState<RecordedReading[]>([]);
   const [placementMessage, setPlacementMessage] = useState("");
+  const [prediction, setPrediction] = useState<number | null>(null);
   const serial = useRef(1);
-  const evaluation = useMemo(() => evaluateCircuit(state), [state]);
+  const evaluation = useMemo(() => evaluateCircuit(state, taskId), [state, taskId]);
   const currentTask = GUIDED_TASKS.find((t) => t.id === taskId) ?? GUIDED_TASKS[0];
 
   useEffect(() => {
@@ -169,9 +170,35 @@ export function CircuitsSim({ onBackToHome }: Props) {
     }));
   }
 
-  function onClipVoltmeter(target: string | "supply") {
+  function onClipVoltmeter(target: string | "supply" | "switch" | null) {
     setState((prev) => ({ ...prev, voltmeterAcross: target }));
     setSelected(null);
+  }
+
+  function onUpdateComponent(id: string, updates: Partial<PathComponent>) {
+    setState((prev) => ({
+      ...prev,
+      sections: prev.sections.map((sec) => {
+        if (sec.type === "series") {
+          if (sec.component.id === id) {
+            return { ...sec, component: { ...sec.component, ...updates } };
+          }
+          return sec;
+        }
+        const b0 = sec.branches[0].map((c) => (c.id === id ? { ...c, ...updates } : c));
+        const b1 = sec.branches[1].map((c) => (c.id === id ? { ...c, ...updates } : c));
+        return { ...sec, branches: [b0, b1] as [PathComponent[], PathComponent[]] };
+      }),
+    }));
+  }
+
+  function handleSetupTask(id: number) {
+    const task = GUIDED_TASKS.find((t) => t.id === id);
+    if (task?.setupFactory) {
+      hardReset(task.setupFactory());
+    }
+    setTaskId(id);
+    setPrediction(null);
   }
 
   function hardReset(next?: CircuitState) {
@@ -233,15 +260,20 @@ export function CircuitsSim({ onBackToHome }: Props) {
         current={currentTask}
         tasks={GUIDED_TASKS}
         evaluation={evaluation}
-        onSelect={setTaskId}
+        prediction={prediction}
+        onPrediction={setPrediction}
+        onSelect={(id) => { setTaskId(id); setPrediction(null); }}
         onReset={() => hardReset()}
+        onSetupTask={handleSetupTask}
         onLoadSeries={() => {
           hardReset(loadSeriesDemo());
           setTaskId(3);
+          setPrediction(null);
         }}
         onLoadParallel={() => {
           hardReset(loadParallelDemo());
           setTaskId(4);
+          setPrediction(null);
         }}
       />
 
@@ -257,6 +289,7 @@ export function CircuitsSim({ onBackToHome }: Props) {
             onSplitParallel={onSplitParallel}
             onClipVoltmeter={onClipVoltmeter}
             onToggleSwitch={() => setState((s) => ({ ...s, switchClosed: !s.switchClosed }))}
+            onUpdateComponent={onUpdateComponent}
           />
           <ComponentTray
             selected={selected}
@@ -276,6 +309,7 @@ export function CircuitsSim({ onBackToHome }: Props) {
             samples={samples}
             readings={readings}
             onRecordReading={recordReading}
+            onClearReadings={() => setReadings([])}
           />
         </div>
       </div>

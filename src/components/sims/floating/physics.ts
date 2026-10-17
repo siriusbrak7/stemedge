@@ -55,6 +55,12 @@ export function generateFloatingExamQuestions(seed = 1): ExamQuestion[] {
   const massKg = seededPick(seed, "floating-fl1-mass", [0.18, 0.24, 0.3]);
   const volumeM3 = seededPick(seed, "floating-fl1-volume", [0.00015, 0.0002, 0.00025]);
   const density = massKg / volumeM3;
+  const displacedVolume = seededPick(seed, "floating-fl2-volume", [0.0015, 0.002, 0.0025]);
+  const liquidDensity = seededPick(seed, "floating-fl2-liquid", [900, 1000, 1100]);
+  const upthrust = liquidDensity * displacedVolume * G_N_PER_KG;
+  const objectDensity = seededPick(seed, "floating-fl3-object-density", [600, 700, 800]);
+  const floatLiquidDensity = seededPick(seed, "floating-fl3-liquid-density", [900, 1000, 1100]);
+  const submergedFraction = objectDensity / floatLiquidDensity;
   return [
     {
       id: "fl1",
@@ -77,16 +83,15 @@ export function generateFloatingExamQuestions(seed = 1): ExamQuestion[] {
       number: 2,
       marks: 2,
       paperRef: "0625/41 · Archimedes",
-      prompt:
-        "An object of volume 0.0020 m³ is fully immersed in water (ρ = 1000 kg/m³). Calculate the upthrust. g = 9.8 N/kg.",
+      prompt: `An object of volume ${displacedVolume.toFixed(4)} m³ is fully immersed in a liquid (ρ = ${liquidDensity} kg/m³). Calculate the upthrust. g = 9.8 N/kg.`,
       kind: "numeric",
-      expected: 19.6,
+      expected: upthrust,
       unit: "N",
       tolerancePct: 2,
       working: {
         equation: "U = ρ V g",
-        substitution: "1000 × 0.0020 × 9.8 = 19.6",
-        answer: "19.6 N",
+        substitution: `${liquidDensity} × ${displacedVolume.toFixed(4)} × 9.8 = ${upthrust.toFixed(2)}`,
+        answer: `${upthrust.toFixed(2)} N`,
       },
       misconception: "Upthrust equals the weight of the displaced liquid, not the object’s weight.",
     },
@@ -95,16 +100,15 @@ export function generateFloatingExamQuestions(seed = 1): ExamQuestion[] {
       number: 3,
       marks: 2,
       paperRef: "0625/41",
-      prompt:
-        "A wooden cube of density 700 kg/m³ floats in water (1000 kg/m³). What fraction of its volume is submerged?",
+      prompt: `A wooden cube of density ${objectDensity} kg/m³ floats in a liquid (${floatLiquidDensity} kg/m³). What fraction of its volume is submerged?`,
       kind: "numeric",
-      expected: 0.7,
+      expected: submergedFraction,
       unit: "",
       tolerancePct: 2,
       working: {
         equation: "V_sub / V = ρ_object / ρ_liquid",
-        substitution: "700 / 1000 = 0.70",
-        answer: "0.700 (70%)",
+        substitution: `${objectDensity} / ${floatLiquidDensity} = ${submergedFraction.toFixed(3)}`,
+        answer: `${submergedFraction.toFixed(3)} (${(submergedFraction * 100).toFixed(1)}%)`,
       },
     },
     {
